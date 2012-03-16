@@ -1,0 +1,452 @@
+########################
+#      zshrc file      # 
+########################
+
+export PATH=.:/usr/lib64/openmpi/1.4-gcc/bin:$HOME/bin/:$PATH
+export LD_LIBRARY_PATH=/usr/lib64/openmpi/1.4-gcc/lib:$HOME/lib
+export PKG_CONFIG_PATH=$HOME/lib/pkgconfig
+export PERL5LIB=`cat /data/perl/PERL5LIB`
+
+# If not running interactively, do nothing 
+[ -z "$PS1" ] && return
+
+## load zsh modules
+autoload -U compinit promptinit zcalc zsh-mime-setup
+compinit
+promptinit
+zsh-mime-setup
+
+## Options
+setopt printexitvalue          # alert me if something's failed
+setopt GLOB_COMPLETE
+setopt PUSHD_MINUS
+setopt RM_STAR_WAIT
+setopt ZLE
+setopt NO_HUP
+setopt VI
+setopt NO_BEEP
+setopt NO_CASE_GLOB
+setopt NUMERIC_GLOB_SORT
+setopt EXTENDED_GLOB
+setopt IGNORE_EOF
+setopt MENUCOMPLETE
+setopt ALL_EXPORT
+
+setopt   notify globdots correct pushdtohome cdablevars autolist
+setopt   correctall autocd recexact longlistjobs
+setopt   autoresume histignoredups pushdsilent 
+setopt   autopushd pushdminus extendedglob rcquotes mailwarning
+
+unsetopt bgnice autoparamslash
+unsetopt ALL_EXPORT
+
+# Autoload zsh modules when they are referenced
+zmodload -a zsh/stat stat
+zmodload -a zsh/zpty zpty
+zmodload -a zsh/zprof zprof
+zmodload -ap zsh/mapfile mapfile
+
+#Variables
+
+#LC_CTYPE=C
+#LC_ALL=C
+export EDITOR=vim
+export PATH=.:/usr/lib64/openmpi/1.4-gcc/bin:$HOME/bin/:$PATH
+export LD_LIBRARY_PATH=/usr/lib64/openmpi/1.4-gcc/lib:/home/hesterj/lib
+export PKG_CONFIG_PATH=$HOME/lib/pkgconfig
+export PERL5LIB=`cat /data/perl/PERL5LIB`
+
+export LANG=en_US.ISO-8859-1 
+export LC_CTYPE="en_US.ISO-8859-1" 
+export LC_NUMERIC="en_US.ISO-8859-1" 
+export LC_TIME="en_US.ISO-8859-1" 
+export LC_COLLATE=C 
+export LC_MONETARY="en_US.ISO-8859-1" 
+export LC_MESSAGES="en_US.ISO-8859-1" 
+export LC_PAPER="en_US.ISO-8859-1" 
+export LC_NAME="en_US.ISO-8859-1" 
+export LC_ADDRESS="en_US.ISO-8859-1" 
+export LC_TELEPHONE="en_US.ISO-8859-1" 
+export LC_MEASUREMENT="en_US.ISO-8859-1" 
+export LC_IDENTIFICATION="en_US.ISO-8859-1" 
+export LC_ALL=
+
+export CDPATH=.:$HOME:`cat ~/.workingDirectiories | tr '\n' ':'`
+## Color completion
+## this module should be automatically loaded if u use menu selection
+## but to be sure we do it here
+zmodload -i zsh/complist
+ZLS_COLORS=$LS_COLORS
+#
+
+setopt INC_APPEND_HISTORY SHARE_HISTORY
+setopt APPEND_HISTORY
+setopt CORRECT
+setopt MENUCOMPLETE
+setopt ALL_EXPORT
+setopt   notify globdots correct pushdtohome cdablevars autolist
+setopt   correctall autocd recexact longlistjobs
+setopt   autoresume histignoredups pushdsilent 
+setopt   autopushd pushdminus extendedglob rcquotes mailwarning
+unsetopt bgnice autoparamslash
+
+# Modules
+#
+
+zmodload -a zsh/stat stat
+zmodload -a zsh/zpty zpty
+zmodload -a zsh/zprof zprof
+zmodload -ap zsh/mapfile mapfile
+
+# Set hsitory stuff.
+#
+HISTFILE=$HOME/.zh
+HISTSIZE=1000000
+SAVEHIST=1000000
+setopt EXTENDED_HISTORY
+setopt HIST_VERIFY
+setopt HIST_IGNORE_DUPS
+setopt SHARE_HISTORY
+setopt INC_APPEND_HISTORY
+
+#per directory history
+
+hgrep (){ find ~/.history/ -type f|xargs grep -H $* | perl -pe 's/.*?\;//';}
+alias cd=mycd
+mycd(){
+  local ohistsize=$HISTSIZE
+  local PREVHISTDIR="$HOME/.history`pwd -P`/"
+  fc -W "${PREVHISTDIR}history"
+  builtin cd "$@"
+  local CURRHISTDIR="$HOME/.history`pwd -P`/"
+  if [ ! -d "$PREVHISTDIR" ]; then 
+    mkdir -p "$PREVHISTDIR"
+  fi
+  if [ ! -d "$CURRHISTDIR" ]; then 
+    mkdir -p "$CURRHISTDIR"
+  fi
+  HISTSIZE=0
+  HISTSIZE=$ohistsize
+  if [ -e "${CURRHISTDIR}history" ]; then
+    fc -R "${CURRHISTDIR}history"
+  fi
+  HISTFILE="${CURRHISTDIR}history"
+}
+#chpwd(){
+#  local ohistsize=$HISTSIZE
+#  local PREVHISTDIR="$HOME/.history"$(echo ~-/) # use nested folders for history
+#  local CURRHISTDIR="$HOME/.history`pwd -L`/"
+#  if [ ! -d "$PREVHISTDIR" ]; then 
+#    mkdir -p "$PREVHISTDIR"
+#  fi
+#  if [ ! -d "$CURRHISTDIR" ]; then 
+#    mkdir -p "$CURRHISTDIR"
+#  fi
+#  fc -W "${PREVHISTDIR}history"
+#  HISTSIZE=0
+#  HISTSIZE=$ohistsize
+#  HISTFILE="${CURRHISTDIR}history"
+#  if [ -e "${CURRHISTDIR}history" ]; then
+#    fc -R "${CURRHISTDIR}history"
+#  fi
+#  fc -W $HISTDIR
+#  HISTSIZE=0 #Discard previous dir's history
+#  HISTSIZE=$ohistsize
+#  fc -R 
+#  builtin cd "$@" # do actual c d
+#  if [ ! -d "$HISTDIR" ]; then # create folder if neede d
+#    mkdir -p "$HISTDIR"
+#  fi
+#  export HISTFILE="$HISTDIR/bash_history.txt" # set& nbsp;new history file
+#  history -c # clear memory
+#  history -r #read from current histfile
+#}
+
+#function zle-line-init zle-keymap-select {
+#    RPS1="${${KEYMAP/vicmd/-- NORMAL --}/(main|viins)/-- INSERT --}"
+#    RPS2=$RPS1
+#    zle reset-prompt
+#}
+#zle -N zle-line-init
+#zle -N zle-keymap-select
+
+#start in command mode
+#zle-line-init() { zle -K vicmd; }
+#zle -N zle-line-init
+
+# Search history
+autoload -U history-search-end
+zle -N history-beginning-search-backward-end history-search-end
+zle -N history-beginning-search-forward-end history-search-end
+bindkey '^[[A' history-beginning-search-backward-end
+bindkey '^[[B' history-beginning-search-forward-end
+
+bindkey "^[[1~" beginning-of-line # Home
+bindkey "^[[4~" end-of-line # End
+bindkey "^[[5~" beginning-of-history # PageUp
+bindkey "^[[6~" end-of-history # PageDown
+bindkey "^[[2~" quoted-insert # Ins
+bindkey "^[[3~" delete-char # Del
+#bindkey "^[[5C" forward-word
+#bindkey "^[Oc" emacs-forward-word
+#bindkey "^[[5D" backward-word
+#bindkey "^[Od" emacs-backward-word
+bindkey "^[b" emacs-backward-word
+bindkey "^[f" emacs-forward-word
+#bindkey "^[[Z" reverse-menu-complete # Shift+Tab
+
+#source ~/prompt.sh
+alias ls='ls -c --color=auto'
+alias lc='ls -lhtcr --color=auto'
+alias lk='ls -lhSr' # sort by size
+alias la='ls -ac --color=auto'
+alias ll='ls -lah --color=auto'
+alias lsd='ls -d */'
+alias lsg='ls --color=auto | g'
+alias lag='ls -a --color=auto | g'
+alias llg='ls -lah --color=auto | g'
+alias g="grep --color=always"
+alias gi="grep -i --color=always"
+alias mv='mv -i'
+alias cp='cp -i'
+#alias rm='rm -i'
+alias rmf='rm -Rfv'
+alias cpf='\cp -v'
+alias mvf='\mv -v'
+alias vi='vim -X'
+alias vim='vim -X'
+
+alias '..'='cd ..'
+alias -g ...='../..'
+alias -g ....='../../..'
+alias -g .....='../../../..'
+
+mdc() { mkdir -p "$1" && cd "$1" }
+
+extract () {
+     if [ -f $1 ] ; then
+         case $1 in
+             *.tar.bz2)   tar --use-compress-prog=pbzip2 xjf $1        ;;
+             *.tar.gz)    tar xzf $1     ;;
+             *.bz2)       pbzip2 -d $1       ;;
+             *.rar)       rar x $1     ;;
+             *.gz)        gunzip $1     ;;
+             *.tar)       tar xf $1        ;;
+             *.tbz2)      tar --use-compress-prog=pbzip2 xjf $1      ;;
+             *.tgz)       tar xzf $1       ;;
+             *.zip)       unzip $1     ;;
+             *.Z)         uncompress $1  ;;
+             *.7z)        7z x $1    ;;
+             *)           echo "'$1' cannot be extracted via extract()" ;;
+         esac
+     else
+         echo "'$1' is not a valid file"
+     fi
+}
+nt() {
+    if [[ -n $1 ]] ; then
+	local NTREF=${~1}
+	[[ $REPLY -nt $NTREF ]]
+    fi
+}
+if [ -n "$PS1" ] ; then
+  rm () 
+  { 
+      ls -FCsd "$@"
+      echo 'remove[ny]? ' | tr -d '\012' ; read
+      if [ "_$REPLY" = "_y" ]; then
+          /bin/rm -rf "$@"
+      else
+          echo '(cancelled)'
+      fi
+  }
+fi
+
+# Key-bindings.
+#
+
+#autoload -U compinit
+#compinit
+bindkey "^r" history-incremental-search-backward
+bindkey ' ' magic-space    # also do history expansion on space
+bindkey '^I' complete-word # complete on tab, leave expansion to _expand
+
+# Auto-completion settings.
+#
+
+setopt CORRECT
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' cache-path ~/.zsh/cache
+
+# Fuzzy matching of completions for when you mistype them
+zstyle ':completion:*' completer _complete _match _approximate
+zstyle ':completion:*:match:*' original only
+zstyle ':completion:*:approximate:*' max-errors 1 numeric
+
+# Prevent CVS files/directories from being completed
+zstyle ':completion:*:(all-|)files' ignored-patterns '(|*/)CVS'
+zstyle ':completion:*:cd:*' ignored-patterns '(*/)#CVS'
+
+# allow one error for every three characters typed in approximate completer
+zstyle -e ':completion:*:approximate:*' max-errors \
+    'reply=( $(( ($#PREFIX+$#SUFFIX)/2 )) numeric )'
+
+export GREP_OPTIONS='--color=auto'
+
+alias mv='nocorrect mv'       # no spelling correction on mv
+alias cp='nocorrect cp'
+alias mkdir='nocorrect mkdir'
+alias aa='~/bin/emailWhenComplete.sh'
+#alias -g ef='*(.f:u+rx:)'
+#alias -g mt='*(.m0)'
+alias dl='aria2c -x 10 --check-certificate=false'
+
+# ignore completion functions (until the _ignored completer)
+zstyle ':completion:*:functions' ignored-patterns '_*'
+zstyle ':completion:*:*:*:users' ignored-patterns \
+        adm apache bin daemon games gdm halt ident junkbust lp mail mailnull \
+        named news nfsnobody nobody nscd ntp operator pcap postgres radvd \
+        rpc rpcuser rpm shutdown squid sshd sync uucp vcsa xfs avahi-autoipd\
+        avahi backup messagebus beagleindex debian-tor dhcp dnsmasq fetchmail\
+        firebird gnats haldaemon hplip irc klog list man cupsys postfix\
+        proxy syslog www-data mldonkey sys snort
+
+## add colors to processes for kill completion
+zstyle ':completion:*:*:kill:*:processes' list-colors '=(#b) #([0-9]#)*=0=01;31'
+
+zstyle ':completion:*:*:kill:*:processes' command 'ps --forest -A -o pid,user,cmd'
+zstyle ':completion:*:processes-names' command 'ps axho command' 
+
+zstyle ':completion:*:*:killall:*:processes' list-colors '=(#b) #([0-9]#)*=0=01;31'
+zstyle ':completion:*:*:killall:*:processes' command 'ps --forest -A -o pid,user,cmd'
+
+# match uppercase from lowercase
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}' 'm:{a-zA-Z}={A-Za-z}'
+
+
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*' list-prompt '%SAt %p: Hit TAB for more, or the character to insert%s'
+zstyle ':completion:*' menu select=1 _complete _ignored _approximate
+
+zstyle ':completion:*' select-prompt '%SScrolling active: current selection at %p%s'
+
+# Completion Styles
+
+# list of completers to use
+#zstyle ':completion:*::::' completer _expand _complete _ignored _approximate
+    
+# insert all expansions for expand completer
+zstyle ':completion:*:expand:*' tag-order all-expansions
+
+# formatting and messages
+zstyle ':completion:*' verbose yes
+zstyle ':completion:*:descriptions' format '%B%d%b'
+zstyle ':completion:*:messages' format '%d'
+zstyle ':completion:*:warnings' format 'No matches for: %d'
+zstyle ':completion:*:corrections' format '%B%d (errors: %e)%b'
+zstyle ':completion:*' group-name ''
+
+# offer indexes before parameters in subscripts
+zstyle ':completion:*:*:-subscript-:*' tag-order indexes parameters
+
+###
+# Prompt adapted from Phil's, at http://aperiodic.net/phil/prompt/prompt.txt
+
+function precmd {
+
+    local TERMWIDTH
+    (( TERMWIDTH = ${COLUMNS} - 1 ))
+
+
+    ###
+    # Truncate the path if it's too long.
+    
+    PR_FILLBAR=""
+    PR_PWDLEN=""
+    
+    local promptsize=${#${(%):---(%n@%m:%l)---()--}}
+    local pwdsize=${#${(%):-%~}}
+    
+    if [[ "$promptsize + $pwdsize" -gt $TERMWIDTH ]]; then
+	    ((PR_PWDLEN=$TERMWIDTH - $promptsize))
+    else
+	PR_FILLBAR="\${(l.(($TERMWIDTH - ($promptsize + $pwdsize)))..${PR_HBAR}.)}"
+    fi
+}
+
+
+setopt extended_glob
+preexec () {
+    print -Pn "\ek$USER[1]$USER[-1]\@$HOST[1]$HOST[-1]: %~/\$1\e\\"
+}
+
+
+setprompt () {
+    ###
+    # Need this so the prompt will work.
+
+    setopt prompt_subst
+
+
+    ###
+    # See if we can use colors.
+
+    autoload colors zsh/terminfo
+    colors
+    for color in RED GREEN YELLOW BLUE MAGENTA CYAN WHITE; do
+	eval PR_$color='%{$terminfo[bold]$fg[${(L)color}]%}'
+	eval PR_LIGHT_$color='%{$fg[${(L)color}]%}'
+	(( count = $count + 1 ))
+    done
+    PR_NO_COLOUR="%{$terminfo[sgr0]%}"
+
+
+    ###
+    # See if we can use extended characters to look nicer.
+    
+    typeset -A altchar
+    set -A altchar ${(s..)terminfo[acsc]}
+    PR_SET_CHARSET="%{$terminfo[enacs]%}"
+    PR_SHIFT_IN="%{$terminfo[smacs]%}"
+    PR_SHIFT_OUT="%{$terminfo[rmacs]%}"
+    PR_HBAR=${altchar[q]:--}
+    PR_ULCORNER=${altchar[l]:--}
+    PR_LLCORNER=${altchar[m]:--}
+    PR_LRCORNER=${altchar[j]:--}
+    PR_URCORNER=${altchar[k]:--}
+
+    
+    PR_TITLEBAR=''
+
+    local STOPPEDJOBS="\$(jobs -s | wc -l | sed -s \"s/ //g\")"
+    
+    ###
+    # Finally, the prompt.
+
+    PROMPT='$PR_SET_CHARSET$PR_STITLE${(e)PR_TITLEBAR}\
+$PR_CYAN$PR_SHIFT_IN$PR_ULCORNER$PR_BLUE$PR_HBAR$PR_SHIFT_OUT(\
+$PR_GREEN%(!.%SROOT%s.%n)$PR_GREEN@%m:%l\
+$PR_BLUE)$PR_SHIFT_IN$PR_HBAR$PR_CYAN$PR_HBAR${(e)PR_FILLBAR}$PR_BLUE$PR_HBAR$PR_SHIFT_OUT(\
+$PR_MAGENTA%$PR_PWDLEN<...<%~%<<\
+$PR_BLUE)$PR_SHIFT_IN$PR_HBAR$PR_CYAN$PR_URCORNER$PR_SHIFT_OUT\
+
+$PR_CYAN$PR_SHIFT_IN$PR_LLCORNER$PR_BLUE$PR_HBAR$PR_SHIFT_OUT(\
+%(?..$PR_LIGHT_RED%?$PR_BLUE:)\
+$PR_YELLOW%D{%H:%M}\
+$PR_LIGHT_BLUE:%(!.$PR_RED.$PR_WHITE)%#$PR_BLUE)$PR_SHIFT_IN$PR_HBAR$PR_SHIFT_OUT\
+$PR_CYAN$PR_SHIFT_IN$PR_HBAR$PR_SHIFT_OUT\
+$PR_NO_COLOUR '
+
+    RPROMPT=' $PR_CYAN$PR_SHIFT_IN$PR_HBAR$PR_BLUE$PR_HBAR$PR_SHIFT_OUT\
+($PR_YELLOW%D{%a,%b%d}$PR_BLUE)$PR_SHIFT_IN$PR_HBAR$PR_CYAN$PR_LRCORNER$PR_SHIFT_OUT$PR_NO_COLOUR'
+
+    PS2='$PR_CYAN$PR_SHIFT_IN$PR_HBAR$PR_SHIFT_OUT\
+$PR_BLUE$PR_SHIFT_IN$PR_HBAR$PR_SHIFT_OUT(\
+$PR_LIGHT_GREEN%_$PR_BLUE)$PR_SHIFT_IN$PR_HBAR$PR_SHIFT_OUT\
+$PR_CYAN$PR_SHIFT_IN$PR_HBAR$PR_SHIFT_OUT$PR_NO_COLOUR '
+}
+
+setprompt
+
+#colemak bindings for vim history
+source ~/.colemak/zshrc
