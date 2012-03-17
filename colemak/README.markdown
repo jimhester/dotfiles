@@ -1,5 +1,9 @@
 # Notes
-I call this the "give me h, j, k and l back but don't screw around with much else" mapping. Most keys are in their colemak positions, few are in qwerty and only one is in neither.
+Found from tuxjay, see link below.
+
+He calls this the "give me h, j, k and l back but don't screw around with much 
+else" mapping. Most keys are in their colemak positions, few are in qwerty and 
+only one is in neither. I like it!
 
 ## Keys in qwerty position
  * h, j, k, l - colemak h, n, e and i: movement.
