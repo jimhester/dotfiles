@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2012 Mar 17
+"   Modified: 2012 Mar 19
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -15,8 +15,9 @@
         " details.
         " filetype off
         "runtime! autoload/pathogen.vim
-        call pathogen#runtime_append_all_bundles()
-        call pathogen#helptags()
+        "call pathogen#runtime_append_all_bundles()
+        "call pathogen#helptags()
+        call pathogen#infect()
         filetype plugin indent on
         " comment out the following to activate the haskell conceal plugin
         "let g:no_haskell_conceal = 1
@@ -468,5 +469,7 @@ map <C-F12> :!ctags -R --sort=yes --c++-kinds=+p --fields=+iaS --extra=+q .<CR>
  au CursorMovedI,InsertLeave * if pumvisible() == 0|silent! pclose|endif
  set completeopt=menuone,menu,longest,preview"
 
+"UltiSnips
+let g:UltiSnipsSnippetDirectories=["UltiSnips","snippets"]
   "inoremap {<CR> {<CR><BS>}<Esc>ko
   "inoremap {<Esc> {<Esc>
