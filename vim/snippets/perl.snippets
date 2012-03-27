@@ -1,0 +1,8 @@
+snippet fastx "read fast(aq) file" b
+use Fastx;
+my $${1:file} = Fastx->new(${2:filename|handle});
+while(my $${3:seq} = $$1->next_seq){
+  ${4:# body...}
+}
+endsnippet
+
