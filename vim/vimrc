@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2012 Mar 19
+"   Modified: 2012 Mar 30
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -249,11 +249,11 @@
     " }}}
     " Format Options        {{{
     " ------------------------------------------------------------------
-        set formatoptions=tcroqwan1b
+        set formatoptions=croqwan1b
         "set formatoptions=aw
         " tcq   default options if not set here
         "
-        " t +   Auto-wrap text using textwidth
+        " t -   Auto-wrap text using textwidth
         " c +   Auto-wrap comments using textwidth, inserting the current
         "       comment leader automatically.
         " r +   Automatically insert the current comment leader after hitting
