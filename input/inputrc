@@ -14,5 +14,12 @@ $if mode=vi
   "e" previous-history
   "i" forward-char
   "h" backward-char
+
+  "k" vi-search-again
+  "u" vi-insertion-mode
+  "U" vi-insert-beg
+  "l" undo
+
+  "j" vi-eword
+  "J" vi-eWord
 $endif
-  
