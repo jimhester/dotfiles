@@ -1,0 +1,18 @@
+set bell-style none
+set completion-ignore-case on
+set editing-mode vi
+set keymap vi
+set mark-directories on
+set mark-modified-lines on
+set mark-symlinked-directories on
+set show-all-if-ambiguous on
+set visible-stats on
+
+$if mode=vi
+  set keymap vi-command
+  "n" next-history
+  "e" previous-history
+  "i" forward-char
+  "h" backward-char
+$endif
+  
