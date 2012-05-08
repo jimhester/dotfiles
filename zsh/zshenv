@@ -1,6 +1,6 @@
-export PATH=.:/usr/lib64/openmpi/1.4-gcc/bin:$HOME/bin/:/data/perl/bin:$PATH
-export LD_LIBRARY_PATH=/usr/lib64/openmpi/1.4-gcc/lib:/home/hesterj/lib
+export PATH=.:$HOME/bin:/data/perl/bin:$PATH
+export LD_LIBRARY_PATH=$HOME/lib64:$HOME/lib
 export PKG_CONFIG_PATH=$HOME/lib/pkgconfig
 export PERL5LIB=`cat /data/perl/PERL5LIB`
-
+export PYTHONPATH=/home/hesterj/lib/python2.7/site-packages
 export DATA_PATH=$HOME/data

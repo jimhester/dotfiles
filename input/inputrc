@@ -8,6 +8,13 @@ set mark-symlinked-directories on
 set show-all-if-ambiguous on
 set visible-stats on
 
+"\e[5~": beginning-of-history # PageUp
+"\e[6~": end-of-history # PageDown
+"\e[2~": quoted-insert # Ins
+"\e[3~": delete-char # Del
+"\e[1~": beginning-of-line # Home
+"\e[4~": end-of-line # End
+
 $if mode=vi
   set keymap vi-command
   "n" next-history
