@@ -119,12 +119,12 @@ alias cd=mycd
 mycd(){
   local ohistsize=$HISTSIZE
   local PREVHISTDIR="$HOME/.history`pwd -P`/"
-  fc -W "${PREVHISTDIR}history"
-  builtin cd "$@"
-  local CURRHISTDIR="$HOME/.history`pwd -P`/"
   if [ ! -d "$PREVHISTDIR" ]; then 
     mkdir -p "$PREVHISTDIR"
   fi
+  fc -W "${PREVHISTDIR}history"
+  builtin cd "$@"
+  local CURRHISTDIR="$HOME/.history`pwd -P`/"
   if [ ! -d "$CURRHISTDIR" ]; then 
     mkdir -p "$CURRHISTDIR"
   fi
