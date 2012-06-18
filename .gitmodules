@@ -25,3 +25,9 @@
 [submodule "vim/bundle/fugitive"]
 	path = vim/bundle/fugitive
 	url = git://github.com/tpope/vim-fugitive
+[submodule "vim/bundle/Vim-R-plugin"]
+	path = vim/bundle/Vim-R-plugin
+	url = git://github.com/jcfaria/Vim-R-plugin.git
+[submodule "vim/bundle/screen"]
+	path = vim/bundle/screen
+	url = git://github.com/ervandew/screen.git

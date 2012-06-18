@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2012 May 08
+"   Modified: 2012 Jun 18
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -322,6 +322,7 @@
     " ------------------------------------------------------------------
         " redefine leader from default backslash
         let mapleader = ","
+        let maplocalleader = ","
         " turn off manual key
         nnoremap K <nop>
         inoremap aa <Esc>"'^
@@ -474,4 +475,5 @@ let g:UltiSnipsSnippetDirectories=["UltiSnips","snippets"]
 inoremap {<CR> {<CR><BS>}<Esc>ko
 inoremap {<Esc> {<Esc>
 
-nnoremap <Leader>x yyp:.!sh<Enter>
+nnoremap <Leader>x yyp:.!sh<Enter> 
+"let vimrplugin_notmuxconf = 1
