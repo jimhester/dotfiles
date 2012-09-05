@@ -2,10 +2,6 @@
 #      zshrc file      # 
 ########################
 
-export PATH=.:$HOME/bin/:$PATH
-export PKG_CONFIG_PATH=$HOME/lib/pkgconfig
-export PERL5LIB=`cat /data/perl/PERL5LIB`
-
 # If not running interactively, do nothing 
 [ -z "$PS1" ] && return
 
@@ -14,6 +10,11 @@ autoload -U compinit promptinit zcalc zsh-mime-setup
 compinit
 promptinit
 zsh-mime-setup
+
+#do not overwrite files with > by default, but edit history to allow 
+#overwriting
+setopt noclobber
+setopt HIST_ALLOW_CLOBBER
 
 ## Options
 setopt printexitvalue          # alert me if something's failed
