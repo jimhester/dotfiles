@@ -4,4 +4,4 @@ export LD_LIBRARY_PATH=$HOME/lib64:$HOME/lib
 export PERL5LIB=`cat /data/perl/PERL5LIB`
 export PYTHONPATH=/home/hesterj/lib/python2.7/site-packages
 export DATA_PATH=$HOME/data
-export MANPATH=$HOME/share/man
+export MANPATH=`manpath`:$HOME/share/man

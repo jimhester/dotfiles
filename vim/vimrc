@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2012 Jun 25
+"   Modified: 2012 Sep 13
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -479,6 +479,9 @@ nnoremap <Leader>x yyp:.!sh<Enter>
 "let vimrplugin_notmuxconf = 1
 
 "  vim-R-plugin
+
+"do not allow insert mode commands
+let g:vimrplugin_insert_mode_cmds = 0 
 
 map <silent> <LocalLeader>h :call RAction("head")<CR>
 map <silent> <LocalLeader>le :call RAction("levels")<CR>
