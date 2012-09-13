@@ -46,15 +46,10 @@ unsetopt ALL_EXPORT
 #LC_CTYPE=C
 #LC_ALL=C
 
-#the screen.vim plugin needs the terminal to be set to screen
-vim_termfix(){
-  PREV=$TERM
-  TERM="screen"
-  vim $@
-  TERM=$PREV
-}
-alias vi='vim'
-alias vim='vim_termfix'
+#htop crashes if term is not xterm
+alias htop="TERM=screen htop"
+
+alias vi=vim
 
 alias ht='tmux split htop'
 alias -g awkt='awk -v OFS="\t"' #This needs to be global to allow insertion into pipes
