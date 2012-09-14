@@ -47,7 +47,7 @@ unsetopt ALL_EXPORT
 #LC_ALL=C
 
 #htop crashes if term is not xterm
-alias htop="TERM=screen htop"
+alias htop="TERM=xterm htop"
 
 alias vi=vim
 
