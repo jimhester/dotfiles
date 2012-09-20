@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2012 Sep 13
+"   Modified: 2012 Sep 20
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -47,8 +47,11 @@
         set nocompatible            " explicitly leave vi-compatibility mode
         "set encoding=utf-8          " unicode encoding by default
         set title                   " show title in terminal
-        set clipboard+=unnamed      " unnamed buffer set to gui register *
+        "set clipboard+=unnamed      " unnamed buffer set to gui register *
                                     " so that dd == "*dd
+        set clipboard=autoselect,exclude:.* " set clipboard to exclude all 
+                                    " so I don't have to set -X when I don't 
+                                    " have a term
         set hidden                  " buffers hidden, not closed, when abandoned
         set undoreload=10000
                                     " save the whole buffer for undo when
@@ -486,3 +489,5 @@ imap <C-A> <Plug>RCompleteArgs
 map <silent> <LocalLeader>h :call RAction("head")<CR>
 map <silent> <LocalLeader>le :call RAction("levels")<CR>
 map <silent> <LocalLeader>di :call RAction("dim")<CR>
+
+

@@ -11,7 +11,6 @@ alias mv='mv -i'
 alias cp='cp -i'
 alias '..'='cd ..'
 alias -g awkt='awk -v OFS="\t"' #This needs to be global to allow insertion into pipes
-
 #functions
 if [ -n "$PS1" ] ; then
   rm () 
