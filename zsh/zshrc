@@ -12,7 +12,7 @@ ZSH_THEME="brute"
 
 ZSH_CUSTOM=$HOME/dotfiles/zsh
 
-EDITOR=vim
+export EDITOR=vim
 
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
