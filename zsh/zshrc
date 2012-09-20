@@ -14,6 +14,8 @@ ZSH_CUSTOM=$HOME/dotfiles/zsh
 
 export EDITOR=vim
 
+HISTORY_BASE=/SerreDLab/hesterj/.directory_history
+
 # Set to this to use case-sensitive completion
 # CASE_SENSITIVE="true"
 
