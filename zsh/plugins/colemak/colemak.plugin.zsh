@@ -18,3 +18,5 @@ bindkey -a 'N' vi-join
 # spare
 bindkey -a 'j' vi-forward-word-end
 bindkey -a 'J' vi-forward-blank-word-end
+
+lesskey $ZSH_CUSTOM/plugins/colemak/colemak-less

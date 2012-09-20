@@ -12,6 +12,8 @@ ZSH_THEME="brute"
 
 ZSH_CUSTOM=$HOME/dotfiles/zsh
 
+EDITOR=vim
+
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
@@ -34,12 +36,10 @@ ZSH_CUSTOM=$HOME/dotfiles/zsh
 # Which plugins would you like to load? (plugins can be found in ~/.oh-my-zsh/plugins/*)
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
-plugins=(git)
-#plugins=(git vi-mode per-directory-history)
+plugins=(vi-mode git per-directory-history history-substring-search colemak)
 
 source $ZSH/oh-my-zsh.sh
 
-EDITOR=vim
 HISTSIZE=1000000
 SAVEHIST=1000000
 # Customize to your needs...

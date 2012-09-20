@@ -1,1 +1,0 @@
-../colemak/zshrc
