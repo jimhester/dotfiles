@@ -7,9 +7,7 @@ alias ll='ls -lah --color=auto'
 alias lsd='ls -d */'
 alias g="grep --color=always"
 alias gi="grep -i --color=always"
-alias mv='mv -i'
-alias cp='cp -i'
-alias '..'='cd ..'
+alias cp='cp -a'
 alias -g awkt='awk -v OFS="\t"' #This needs to be global to allow insertion into pipes
 #functions
 if [ -n "$PS1" ] ; then

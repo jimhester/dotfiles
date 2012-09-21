@@ -38,6 +38,7 @@ plugins=(vi-mode git per-directory-history history-substring-search colemak)
 
 source $ZSH/oh-my-zsh.sh
 
+HISTFILE=/SerreDLab/hesterj/.zsh_history
 HISTSIZE=1000000
 SAVEHIST=1000000
 # Customize to your needs...
