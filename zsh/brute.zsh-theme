@@ -32,7 +32,7 @@ autoload -U promptinit  # not used right now...
 # the following addresses problems with the oh-my-zsh vim plugin eating the
 # line above the prompt with resetting it. I've had no negative impact from
 # nullifying the function of zle-line-init
-function zle-line-init { }
+#function zle-line-init { }
 
 # debug mode
 # zstyle ':vcs_info:*+*:*' debug true
