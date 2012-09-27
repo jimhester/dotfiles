@@ -28,3 +28,6 @@
 [submodule "vim/bundle/screen"]
 	path = vim/bundle/screen
 	url = git://github.com/ervandew/screen.git
+[submodule "vim/bundle/ultisnips"]
+	path = vim/bundle/ultisnips
+	url = https://github.com/SirVer/ultisnips

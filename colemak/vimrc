@@ -1,11 +1,14 @@
 " " colemak
 " set langmap=sd,fe,tf,dg,ui,nj,ek,il,kn,yo,\\;p,pr,rs,gt,lu,jy,SD,FE,TF,DG,UI,NJ,EK,IL,KN,YO,:P,PR,RS,GT,LU,JY,o\\;,O:
 
-" get control-j back, so switch it with ctrl-n at qwerty position of j
+" get control-j and control-k back, so switch it with ctrl-n at qwerty position 
+" of j
 "imap <c-n> <cr>
-"cmap <c-n> <cr>
+"cmap <c-n> <down>
 "inoremap <c-j> <c-n>
 "cnoremap <c-j> <c-n>
+"imap <c-e> <Up><cr>
+"cmap <c-e> <Up>
 
 " rotate some keys about to get qwerty "hjkl" back for movement
 map n <down>
