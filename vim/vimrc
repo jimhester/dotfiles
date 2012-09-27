@@ -491,7 +491,7 @@ nnoremap <Leader>x yyp:.!sh<Enter>
 "do not allow insert mode commands
 let g:vimrplugin_insert_mode_cmds = 0
 let vimrplugin_notmuxconf = 1
-imap <C-A> <Plug>RCompleteArgs
+imap <c-r> <Plug>RCompleteArgs
 
 map <silent> <LocalLeader>h :call RAction("head")<CR>
 map <silent> <LocalLeader>le :call RAction("levels")<CR>
