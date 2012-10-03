@@ -10,25 +10,26 @@ $0
 endsnippet
 
 snippet rp "R plot"
-\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, dev=${2:'svg'}${3: ,warning=${4:FALSE}}\}
+\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, dev=${3:'svg'}${4: ,warning=${5:FALSE}}\}
 $0
 \`\`\`
 endsnippet
 
 snippet zsh "R zsh shell commands"
-\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, engine='${2:zsh}'\}
+\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, engine='${3:zsh}'\}
 $0
 \`\`\`
 endsnippet
 
 snippet perl "include perl script sourcecode"
-### ${3}.pl ###
-\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, engine='bash'\}
-strip_perl ${3}.pl
+### ${1:filename}.pl $2 ###
+\`\`\`\{r engine='bash', echo=FALSE\}
+strip_perl $1.pl
 \`\`\`
 endsnippet
+
 snippet bash "bash shell commands"
-\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, engine='${2:bash}'\}
+\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, engine='${3:bash}'\}
 $0
 \`\`\`
 endsnippet
