@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2012 Sep 27
+"   Modified: 2012 Oct 03 10:51:02 AM - Jim Hester
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -40,6 +40,7 @@
         set backupdir=$DATA_PATH/vim/backup// " backups
         set directory=$DATA_PATH/vim/swap//   " swap files
         set undofile  " use persistent undofile
+        set undodir=$DATA_PATH/vim/undo//     " undo files
         "set autochdir " always switch to the current file's dir
     " }}}
     " Environment           {{{
@@ -435,8 +436,9 @@
     " ------------------------------------------------------------------
     let g:timestamp_username="Jim Hester"
     let g:timestamp_modelines=15
-    let g:timestamp_rep='%Y %b %d'
-    let g:timestamp_regexp='\c\%(\<\%(last \)\?\%(changed?\|modified\):\s\+\)\@<=\%(\d\{4}\D.\{-}\d\{2}\|TIMESTAMP\)'
+    let g:timestamp_rep='%Y %b %d %r - #u'
+    "let g:timestamp_regexp='\c\%(\<\%(last \)\?\%(changed?\|modified\):\s\+\)\@<=\%(\d\{4}\|TIMESTAMP\).*$'
+    let g:timestamp_regexp='\v\c%(<%(last )?%(changed?|modified):\s+)@<=%(\d{4}.*$?|TIMESTAMP)'
     " Completion            {{{
     " ------------------------------------------------------------------
         set ofu=syntaxcomplete#Complete
@@ -496,7 +498,15 @@ imap <c-r> <Plug>RCompleteArgs
 map <silent> <LocalLeader>h :call RAction("head")<CR>
 map <silent> <LocalLeader>le :call RAction("levels")<CR>
 map <silent> <LocalLeader>di :call RAction("dim")<CR>
-
+nnoremap <silent> <Space>kk :call RMakeHTML_2()<CR>
+let vimrplugin_underscore = 0
+function! RMakeHTML_2()
+    call RSetWD()
+    update
+    let filename = expand("%:t:r")
+    let rcmd = 'require(knitr);require(markdown);knit("'.expand("%:t").'");markdownToHTML("'.filename.'.md", "'.filename.'.html")'
+    call SendCmdToR(rcmd)
+endfunction
 
 let g:UltiSnipsExpandTrigger="<tab>"
 let g:UltiSnipsJumpForwardTrigger="<tab>"
