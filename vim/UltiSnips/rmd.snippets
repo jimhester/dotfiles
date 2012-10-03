@@ -1,0 +1,63 @@
+extends markdown
+
+###########################################################################
+#                          SNIPPETS for RMARKDOWN                          #
+###########################################################################
+snippet rc "R code"
+\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}\}
+$0
+\`\`\`
+endsnippet
+
+snippet rp "R plot"
+\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, dev=${2:'svg'}${3: ,warning=${4:FALSE}}\}
+$0
+\`\`\`
+endsnippet
+
+snippet zsh "R zsh shell commands"
+\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, engine='${2:zsh}'\}
+$0
+\`\`\`
+endsnippet
+
+snippet perl "include perl script sourcecode"
+### ${3}.pl ###
+\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, engine='bash'\}
+strip_perl ${3}.pl
+\`\`\`
+endsnippet
+snippet bash "bash shell commands"
+\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, engine='${2:bash}'\}
+$0
+\`\`\`
+endsnippet
+
+snippet start "setup caching and ggplot themes"
+# ${1:Title} #
+Created: TIMESTAMP
+Last Modified: TIMESTAMP
+\`\`\`{r ${2:`!v expand("%:t:r")`_${3:setup}},cache=FALSE,include=FALSE}
+files <- c('${0}')
+opts_knit$set(cache.extra=sum(unlist(llply(files,function(x) file.info(x)$mtime ))))
+opts_chunk$set(cache=TRUE, autodep=TRUE)
+dep_auto()
+require(ggplot2)
+theme_set(theme_bw())
+\`\`\`
+endsnippet
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
