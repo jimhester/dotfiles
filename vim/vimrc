@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2012 Oct 03 10:51:02 AM - Jim Hester
+"   Modified: 2012 Oct 03 11:50:26 AM - Jim Hester
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -438,7 +438,7 @@
     let g:timestamp_modelines=15
     let g:timestamp_rep='%Y %b %d %r - #u'
     "let g:timestamp_regexp='\c\%(\<\%(last \)\?\%(changed?\|modified\):\s\+\)\@<=\%(\d\{4}\|TIMESTAMP\).*$'
-    let g:timestamp_regexp='\v\c%(<%(last )?%(changed?|modified):\s+)@<=%(\d{4}.*$?|TIMESTAMP)'
+    let g:timestamp_regexp='\v\c%(<%(last )?%(changed?|modified):\s+)@<=%(\d{4}.*$?)|TIMESTAMP.*$'
     " Completion            {{{
     " ------------------------------------------------------------------
         set ofu=syntaxcomplete#Complete
