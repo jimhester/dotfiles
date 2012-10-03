@@ -1,6 +1,7 @@
 #use updated local zsh rather than builtin
 [[ $SHELL != $HOME/bin/zsh ]] && [ -f $HOME/bin/zsh ] && SHELL=$HOME/bin/zsh exec /usr/bin/env $HOME/bin/zsh -l
 
+export BASH_ENV=$HOME/dotfiles/zsh/functions.zsh
 # Path to your oh-my-zsh configuration.
 ZSH=$HOME/.oh-my-zsh
 
