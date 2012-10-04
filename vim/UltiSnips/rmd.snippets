@@ -5,19 +5,19 @@ extends markdown
 ###########################################################################
 snippet rc "R code"
 \`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}\}
-$0
+${VISUAL}
 \`\`\`
 endsnippet
 
 snippet rp "R plot"
-\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, dev=${3:'svg'}${4: ,warning=${5:FALSE}}\}
-$0
+\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title},}dev=${3:'svg'}${4: ,warning=${5:FALSE}}\}
+${VISUAL}
 \`\`\`
 endsnippet
 
 snippet zsh "R zsh shell commands"
-\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, engine='${3:zsh}'\}
-$0
+\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title},}engine='${3:zsh}'\}
+${VISUAL}
 \`\`\`
 endsnippet
 
@@ -29,16 +29,14 @@ strip_perl $1.pl
 endsnippet
 
 snippet bash "bash shell commands"
-\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}, engine='${3:bash}'\}
-$0
+\`\`\`\{r ${2:`!v expand("%:t:r")`_${1:Title},}engine='${3:bash}'\}
+${VISUAL}
 \`\`\`
 endsnippet
 
 snippet start "setup caching and ggplot themes"
 # ${1:Title} #
-Created: TIMESTAMP
-Last Modified: TIMESTAMP
-\`\`\`{r ${2:`!v expand("%:t:r")`_${3:setup}},cache=FALSE,include=FALSE}
+\`\`\`{r ${2:`!v expand("%:t:r")`_${3:setup},}cache=FALSE,include=FALSE}
 files <- c('${0}')
 opts_knit$set(cache.extra=sum(unlist(llply(files,function(x) file.info(x)$mtime ))))
 opts_chunk$set(cache=TRUE, autodep=TRUE)
@@ -48,17 +46,26 @@ theme_set(theme_bw())
 \`\`\`
 endsnippet
 
+snippet h1 "H1 header"
+# ${VISUAL:Text} #
+endsnippet
 
+snippet h2 "H2 header"
+## ${VISUAL:Text} ##
+endsnippet
 
+snippet h3 "H3 header"
+### ${VISUAL:Text} ###
+endsnippet
 
+snippet h4 "H4 header"
+#### ${VISUAL:Text} ####
+endsnippet
 
+snippet h5 "H5 header"
+##### ${VISUAL:Text} #####
+endsnippet
 
-
-
-
-
-
-
-
-
-
+snippet h6 "H6 header"
+###### ${VISUAL:Text} ######
+endsnippet
