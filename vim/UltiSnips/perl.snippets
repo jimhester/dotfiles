@@ -6,7 +6,7 @@ endsnippet
 snippet fastx "Fastx reader"
 use readFastx;
 my $${1:fastx} = readFastx->new($3);
-while(my $${2:seq} = $1->next_seq){
+while(my $${2:seq} = $$1->next_seq){
   $0
 }
 endsnippet
