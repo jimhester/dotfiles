@@ -34,15 +34,20 @@ ${0:${VISUAL}}
 \`\`\`
 endsnippet
 
-snippet start "setup caching and ggplot themes"
+snippet start "setup caching"
 # ${1:Title} #
-\`\`\`{r ${2:`!v expand("%:t:r")`_${3:setup},}cache=FALSE,include=FALSE}
-files <- c('${0}')
-opts_knit$set(cache.extra=sum(unlist(llply(files,function(x) file.info(x)$mtime ))))
+\`\`\`{r ${2:`!v expand("%:t:r")`_${3:setup}},cache=FALSE,include=FALSE}
+mtime <- function(files){
+  sum(unlist(lapply(files,function(x) file.info(x)$mtime )))
+}
+files <- c('${4}')
+opts_chunk$set(cache.extra=mtime(files),cache=TRUE)
 opts_chunk$set(cache=TRUE)
-require(ggplot2)
-theme_set(theme_bw())
+dep_prev()
 \`\`\`
+$0
+Created: TIMESTAMP
+Last Modified: TIMESTAMP
 endsnippet
 
 snippet h1 "H1 header"

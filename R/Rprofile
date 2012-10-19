@@ -29,4 +29,6 @@ if(interactive()){
 #    options(editor = 'gvim -f -c "set ft=r"')
 #    options(pager = "gvim -c 'set ft=rdoc' -")
   }
+  require(ggplot2)
+  theme_set(theme_bw())
 }
