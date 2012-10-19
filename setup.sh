@@ -14,6 +14,7 @@ backup ~/.zshrc;ln -s ~/dotfiles/zsh/zshrc ~/.zshrc
 backup ~/.tmux.conf;ln -s ~/dotfiles/tmux/tmux.conf ~/.tmux.conf
 backup ~/.inputrc;ln -s ~/dotfiles/input/inputrc ~/.inputrc
 backup ~/.Renviron;ln -s ~/dotfiles/R/Renviron ~/.Renviron
+backup ~/.Rprofile;ln -s ~/dotfiles/R/Rprofile ~/.Rprofile
 
 git config --global core.excludesfile ~/dotfiles/.gitignore
 git config --global user.name "Jim Hester"
