@@ -10,3 +10,10 @@ while(my $${2:seq} = $$1->next_seq){
   $0
 }
 endsnippet
+
+snippet open "Open file and parse" !b
+open ${1:IN}, "${2:filename}" or die "$!:Could not open $2\n";
+while(<$1>){
+  $0
+}
+endsnippet

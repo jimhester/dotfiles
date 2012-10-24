@@ -22,8 +22,8 @@ ${VISUAL}
 endsnippet
 
 snippet perl "include perl script sourcecode"
-### ${1:filename}.pl${2: description} ###
-\`\`\`\{r engine='bash', echo=FALSE\}
+### ${1:filename}.pl ${2:description} ###
+\`\`\`\{r engine='bash', echo=FALSE, cache.extra=mtime('$1.pl')\}
 strip_perl $1.pl
 \`\`\`
 endsnippet
@@ -38,12 +38,10 @@ snippet start "setup caching"
 # ${1:Title} #
 \`\`\`{r ${2:`!v expand("%:t:r")`_${3:setup}},cache=FALSE,include=FALSE}
 mtime <- function(files){
-  sum(unlist(lapply(files,function(x) file.info(x)$mtime )))
+  sum(unlist(lapply(Sys.glob(files),function(x) file.info(x)$mtime )))
 }
 files <- c('${4}')
 opts_chunk$set(cache.extra=mtime(files),cache=TRUE)
-opts_chunk$set(cache=TRUE)
-dep_prev()
 \`\`\`
 $0
 Created: TIMESTAMP
@@ -75,11 +73,11 @@ snippet h6 "H6 header"
 endsnippet
 
 snippet c "concatonate vector" w
-c("$1"$0)
+c('$1'$0)
 endsnippet
 
 snippet , "quoted comma" i
-, "$1"$0
+, '$1'$0
 endsnippet
 
 snippet child "include child document"
