@@ -1,12 +1,18 @@
 #!/bin/env sh
-_psave_lines=10
 function psave() { #save a file, printing the first 11 lines
                    #80 characters wide only
+  lines=10
+  width=80
   while :; do
     case "$1" in
       -n)
         shift
-        _psave_lines=$1
+        lines=$1
+        shift
+        ;;
+      -w|--width)
+        shift
+        width=$1
         shift
         ;;
       *)
@@ -18,13 +24,13 @@ function psave() { #save a file, printing the first 11 lines
   shift
   if [[ ! -z $1 ]];then 
     title="$@"
-    size=$(((${#title}+78)/2))
+    size=$(((${#title}+($width-2))/2))
     echo "################################################################################"
     printf "#%*s%*s\n" $size "$title" $(($size-${#title}+${#title}%2+1)) "#"
     echo "################################################################################"
   fi
   trap '' SIGPIPE
-  tee $file 2> /dev/null | head -n $_psave_lines  | cut -c -80
+  tee $file 2> /dev/null | head -n $lines  | cut -c -$width
   trap SIGPIPE #unset the trap
 }
 function rn() { #run the commands only if the input file is newer than the 
