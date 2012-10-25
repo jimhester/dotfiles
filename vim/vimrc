@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2012 Oct 25 11:25:25 AM
+"   Modified: 2012 Oct 25 11:26:57 AM
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -517,6 +517,5 @@ let g:UltiSnipsListSnippets="<c-l>"
 nnoremap <F5> :GundoToggle<CR>
 "neocomplcache
 let g:neocomplcache_enable_at_startup=1
-imap <expr> <TAB> neocomplcache#sources#snippets_complete#expandable() ? 
-          \  "\<Plug>(neocomplcache_snippets_expand)" : "\<Plug>SuperTabForward" 
+"imap <expr> <TAB> <Plug>SuperTabForward" 
 nn <F7> :setlocal spell! spell?<CR> "toggle spell checking with F7 like word
