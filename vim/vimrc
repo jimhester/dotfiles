@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2012 Oct 25 09:43:32 AM
+"   Modified: 2012 Oct 25 10:06:42 AM
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -515,3 +515,5 @@ let g:UltiSnipsListSnippets="<c-l>"
 
 "gundo
 nnoremap <F5> :GundoToggle<CR>
+"neocomplcache
+let g:neocomplcache_enable_at_startup=1
