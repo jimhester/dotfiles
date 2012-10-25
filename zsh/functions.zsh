@@ -2,10 +2,22 @@
 _psave_lines=10
 function psave() { #save a file, printing the first 11 lines
                    #80 characters wide only
+  while :; do
+    case "$1" in
+      -n)
+        shift
+        _psave_lines=$1
+        shift
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
   file=$1
   shift
-  title="$@"
   if [[ ! -z $1 ]];then 
+    title="$@"
     size=$(((${#title}+78)/2))
     echo "################################################################################"
     printf "#%*s%*s\n" $size "$title" $(($size-${#title}+${#title}%2+1)) "#"
