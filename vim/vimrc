@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2012 Oct 25 11:26:57 AM
+"   Modified: 2012 Oct 26 02:59:35 PM
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -487,7 +487,7 @@ autocmd FileType *
 "let g:SuperTabDefaultCompletionType = "context"
 
 nnoremap <Leader>x yyp:.!bash<Enter> 
-"let vimrplugin_notmuxconf = 1
+"let vimrplugin_notmuxconf = 0
 
 "Vim-R
 "do not allow insert mode commands
@@ -517,5 +517,8 @@ let g:UltiSnipsListSnippets="<c-l>"
 nnoremap <F5> :GundoToggle<CR>
 "neocomplcache
 let g:neocomplcache_enable_at_startup=1
+let g:neocomplcache_force_overwrite_completefunc=1
 "imap <expr> <TAB> <Plug>SuperTabForward" 
 nn <F7> :setlocal spell! spell?<CR> "toggle spell checking with F7 like word
+"table header
+nnoremap <F8> yyP:s/\v\S.{-}\ze(\s{1}\S\|$)/\=substitute(submatch(0),'.','-','g')/g<CR>
