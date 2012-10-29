@@ -41,7 +41,7 @@ mtime <- function(files){
   sum(unlist(lapply(Sys.glob(files),function(x) file.info(x)$mtime )))
 }
 files <- c('${4}')
-opts_chunk$set(cache.extra=mtime(files),cache=TRUE)
+opts_chunk$set(cache.extra=mtime(files),cache=TRUE,cl.opts='-l')
 \`\`\`
 $0
 Created: TIMESTAMP
