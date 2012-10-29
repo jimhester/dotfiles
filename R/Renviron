@@ -1,1 +1,2 @@
 R_HISTSIZE=100000
+R_LIBS_USER="~/R/library" #same as Rstudio
