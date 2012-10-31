@@ -33,7 +33,7 @@ function psave() { #save a file, printing the first 11 lines
   tee $file 2> /dev/null | head -n $lines  | cut -c -$width
   trap SIGPIPE #unset the trap
 }
-function rn() { #run the commands only if the input file is newer than the 
+function rif() { #run the commands only if the input file is newer than the 
                 #output file, input than output
   local input=$1;shift
   local output=$1;shift
