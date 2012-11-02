@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2012 Oct 26 02:59:35 PM
+"   Modified: 2012 Nov 02 08:30:46 AM
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -506,6 +506,8 @@ function! RMakeHTML_2()
     let filename = expand("%:t:r")
     let rcmd = 'require(knitr);require(markdown);knit("'.expand("%:t").'");markdownToHTML("'.filename.'.md", "'.filename.'.html")'
     call SendCmdToR(rcmd)
+    silent execute '!pandoc -s --self-contained --toc ' . filename . '.md -o ' . filename .'.html -H ~/share/buttondown.css'
+    redraw!
 endfunction
 
 let g:UltiSnipsExpandTrigger="<tab>"
@@ -521,4 +523,5 @@ let g:neocomplcache_force_overwrite_completefunc=1
 "imap <expr> <TAB> <Plug>SuperTabForward" 
 nn <F7> :setlocal spell! spell?<CR> "toggle spell checking with F7 like word
 "table header
-nnoremap <F8> yyP:s/\v\S.{-}\ze(\s{1}\S\|$)/\=substitute(submatch(0),'.','-','g')/g<CR>
+nnoremap <F8> yyP:s/\v\S.{-}\ze(\s{2}\S\|$)/\=substitute(submatch(0),'.','-','g')/g<CR>
+set pastetoggle=<F6>
