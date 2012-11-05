@@ -13,7 +13,7 @@ ZSH_THEME="brute"
 
 ZSH_CUSTOM=$HOME/dotfiles/zsh
 
-export EDITOR=vim
+export EDITOR=$HOME/bin/vim
 
 HISTORY_BASE=/SerreDLab/hesterj/.directory_history
 
@@ -37,10 +37,12 @@ HISTORY_BASE=/SerreDLab/hesterj/.directory_history
 # Example format: plugins=(rails git textmate ruby lighthouse)
 plugins=(vi-mode git per-directory-history history-substring-search colemak)
 
+bindkey '^[OA' history-substring-search-up
+bindkey '^[OB' history-substring-search-down
+
 source $ZSH/oh-my-zsh.sh
 
 HISTFILE=/SerreDLab/hesterj/.zsh_history
 HISTSIZE=1000000
 SAVEHIST=1000000
 # Customize to your needs...
-export PATH=/usr/kerberos/bin:.:/home/hesterj/bin:/data/perl/bin:/usr/local/bin:/bin:/usr/bin

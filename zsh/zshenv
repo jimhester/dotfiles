@@ -1,7 +1,12 @@
-export PATH=.:$HOME/bin:/data/perl/bin:$PATH
+export PATH=/usr/kerberos/bin:.:/home/hesterj/bin:/home/hesterj/fu/:/SerreDLab/hesterj/perl5/bin:/usr/local/bin:/bin:/usr/bin
 export LD_LIBRARY_PATH=$HOME/lib64:$HOME/lib
 #export PKG_CONFIG_PATH=$HOME/lib/pkgconfig
-export PERL5LIB=`cat /data/perl/PERL5LIB`
-export PYTHONPATH=/home/hesterj/lib/python2.7/site-packages
+#export PERL5LIB=`cat /data/perl/PERL5LIB`
+#export PERL5LIB=/SerreDLab/hesterj/perl:/SerreDLab/hesterj/perl/modules
 export DATA_PATH=$HOME/data
+export PYTHONPATH=/home/hesterj/lib/python2.7/site-packages
 export MANPATH=`manpath`:$HOME/share/man
+
+#set perl environment variables
+eval `perl -I /SerreDLab/hesterj/perl5/lib/perl5 -Mlocal::lib`
+export PERL5LIB=/SerreDLab/hesterj/perl5/modules:$PERL5LIB

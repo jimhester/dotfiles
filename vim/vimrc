@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2012 Nov 02 08:30:46 AM
+"   Modified: 2012 Nov 02 09:46:15 AM
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -500,15 +500,19 @@ map <silent> <LocalLeader>le :call RAction("levels")<CR>
 map <silent> <LocalLeader>di :call RAction("dim")<CR>
 nnoremap <silent> <Space>kk :call RMakeHTML_2()<CR>
 let vimrplugin_underscore = 0
+let g:vimrplugin_openhtml = 1
 function! RMakeHTML_2()
-    call RSetWD()
-    update
+    call RKnit()
     let filename = expand("%:t:r")
-    let rcmd = 'require(knitr);require(markdown);knit("'.expand("%:t").'");markdownToHTML("'.filename.'.md", "'.filename.'.html")'
+    let filename_md = filename .'.md'
+    let filename_html = filename .'.html'
+    let rcmd = 'system("fix_markdown '. filename_md .';pandoc -s --self-contained --toc  -H ~/share/buttondown.css ' . filename_md . ' -o ' . filename_html . '")'
+    if g:vimrplugin_openhtml
+        let rcmd = rcmd . '; browseURL("' . expand("%:r:t") . '.html")'
+    endif
     call SendCmdToR(rcmd)
-    silent execute '!pandoc -s --self-contained --toc ' . filename . '.md -o ' . filename .'.html -H ~/share/buttondown.css'
-    redraw!
 endfunction
+
 
 let g:UltiSnipsExpandTrigger="<tab>"
 let g:UltiSnipsJumpForwardTrigger="<tab>"
