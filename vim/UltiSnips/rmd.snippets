@@ -6,26 +6,26 @@ extends sh
 ###########################################################################
 snippet rc "R code"
 \`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title}}\}
-${VISUAL}
+${0:${VISUAL}}
 \`\`\`
 endsnippet
 
 snippet rp "R plot"
 \`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title},}dev=${3:'svg'}${4: ,warning=${5:FALSE}}\}
-${VISUAL}
+${0:${VISUAL}}
 \`\`\`
 endsnippet
 
 snippet zsh "R zsh shell commands"
 \`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title},}engine='${3:zsh}'\}
-${VISUAL}
+${0:${VISUAL}}
 \`\`\`
 endsnippet
 
 snippet perl "include perl script sourcecode"
 ### ${1:filename}.pl ${2:description} ###
-\`\`\`\{r engine='bash', echo=FALSE, cache.extra=mtime('$1.pl')\}
-strip_perl $1.pl
+\`\`\`\{r engine='bash', echo=FALSE, comment='perl', cache.extra=mtime('$1.pl')\}
+strip_perl $1.pl $0
 \`\`\`
 endsnippet
 

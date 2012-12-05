@@ -1,11 +1,13 @@
+extends perl
+
 snippet jimbar "Use Jimbar to make file progress bar"
 use JimBar;
 my $bar = JimBar->new($0);
 endsnippet
 
 snippet fastx "Fastx reader"
-use readFastx;
-my $${1:fastx} = readFastx->new($3);
+use read_fastx;
+my $${1:fastx} = read_fastx->new($3);
 while(my $${2:seq} = $$1->next_seq){
   $0
 }
@@ -16,4 +18,73 @@ open ${1:IN}, "${2:filename}" or die "$!:Could not open $2\n";
 while(<$1>){
   $0
 }
+endsnippet
+
+snippet start "Create a new perl script"
+#!/usr/bin/perl
+use warnings;
+use strict;
+###############################################################################
+# By Jim Hester
+# Created: TIMESTAMP
+# Last Modified: TIMESTAMP
+# Title:${1:Title}.pl
+# Purpose:${2:Description}
+###############################################################################
+# Code to handle help menu and man page
+###############################################################################
+use Getopt::Long;
+use Pod::Usage;
+my \$man = 0;
+my \$help = 0;
+GetOptions('help|?' => \\\$help, man => \\\$man) or pod2usage(2);
+pod2usage(2) if \$help;
+pod2usage(-verbose => 2) if \$man;
+pod2usage("\$0: No files given.")  if ((@ARGV == 0) && (-t STDIN));
+###############################################################################
+# Automatically extract compressed files
+###############################################################################
+@ARGV = map \{ s/(.*\\.gz)\\s*\$/pigz -dc < \$1|/; s/(.*\\.bz2)\\s*\$/pbzip2 -dc < \$1|/;\$_ } @ARGV;
+###############################################################################
+# $1.pl
+###############################################################################
+
+$0
+
+###############################################################################
+# Help Documentation
+###############################################################################
+
+=head1 NAME
+
+$1 - $2
+
+=head1 SYNOPSIS
+
+$1.pl [options] [file ...]
+
+Options:
+      -help
+      -man               for more info
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-help>
+
+Print a brief help message and exits.
+
+=item B<-man>
+
+Prints the manual page and exits.
+
+=back
+
+=head1 DESCRIPTION
+
+B<$1.pl> $2
+
+=cut
+
 endsnippet
