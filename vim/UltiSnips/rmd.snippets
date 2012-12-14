@@ -1,5 +1,6 @@
 extends markdown
 extends sh
+extends r
 
 ###########################################################################
 #                          SNIPPETS for RMARKDOWN                          #
@@ -23,7 +24,7 @@ ${0:${VISUAL}}
 endsnippet
 
 snippet perl "include perl script sourcecode"
-### ${1:filename}.pl ${2:description} ###
+#### ${1:filename}.pl ${2:description} ####
 \`\`\`\{r engine='bash', echo=FALSE, comment='perl', cache.extra=mtime('$1.pl')\}
 strip_perl $1.pl $0
 \`\`\`

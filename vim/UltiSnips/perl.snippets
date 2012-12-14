@@ -6,8 +6,8 @@ my $bar = JimBar->new($0);
 endsnippet
 
 snippet fastx "Fastx reader"
-use read_fastx;
-my $${1:fastx} = read_fastx->new($3);
+use ReadFastx;
+my $${1:fastx} = ReadFastx->new($3);
 while(my $${2:seq} = $$1->next_seq){
   $0
 }
@@ -57,7 +57,7 @@ $0
 
 =head1 NAME
 
-$1 - $2
+$1.pl - $2
 
 =head1 SYNOPSIS
 
