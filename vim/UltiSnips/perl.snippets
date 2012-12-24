@@ -1,8 +1,8 @@
 extends perl
 
-snippet jimbar "Use Jimbar to make file progress bar"
-use JimBar;
-my $bar = JimBar->new($0);
+snippet filebar "Use FileBar to make a file progress bar"
+use FileBar;
+my $bar = FileBar->new($0);
 endsnippet
 
 snippet fastx "Fastx reader"
@@ -13,22 +13,76 @@ while(my $${2:seq} = $$1->next_seq){
 }
 endsnippet
 
-snippet open "Open file and parse" !b
-open ${1:IN}, "${2:filename}" or die "$!:Could not open $2\n";
-while(<$1>){
+snippet sam "Sam/Bam reader"
+use ReadSam;
+my $${1:sam} = ReadSam->new($3);
+while(my $${2:align} = $$1->next_align){
   $0
 }
 endsnippet
 
+snippet open "Open file and parse" !b
+open my $${1:in}, "${2:<}", "${3:filename}" or die "$!:Could not open $3\n";
+while(<$$1>){
+  $0
+}
+endsnippet
+
+snippet sub "Subroutine definition with arguments" !b
+sub ${1:name} {
+  ${2:my ($self) = shift;}
+  ${3:my $args = @_ == 1 && ref $_[0] ? $_[0] : { @_ };}
+  $0
+}
+endsnippet
+
+snippet no_ext "Subroutine to remove an extension" !b
+sub no_extension {
+  my (\$path) = @_;
+  \$path =~ s{\..*}{};
+  return $path;
+}
+endsnippet
+
+snippet base "Subroutine to remove directory information" !b
+sub base {
+  my (\$path) = @_;
+  \$path =~ s{.*/}{};
+  return $path;
+}
+endsnippet
+
+snippet cores "Subroutine to get the number of cores on GNU/Linux"
+sub no_of_cores_gnu_linux {
+
+  # Returns:
+  #   Number of CPU cores on GNU/Linux
+  my \$no_of_cores;
+  if (-e "/proc/cpuinfo") {
+    \$no_of_cores = 0;
+    open(IN, "cat /proc/cpuinfo|") || return undef;
+    while (<IN>) {
+      /^processor.*[:]/ and \$no_of_cores++;
+    }
+    close IN;
+  }
+  return \$no_of_cores;
+}
+endsnippet
+
+snippet test
+`echo %`
+endsnippet
+
 snippet start "Create a new perl script"
-#!/usr/bin/perl
+#!/usr/bin/env perl
 use warnings;
 use strict;
 ###############################################################################
 # By Jim Hester
 # Created: TIMESTAMP
 # Last Modified: TIMESTAMP
-# Title:${1:Title}.pl
+# Title:${1:`!v bufname("%")`}
 # Purpose:${2:Description}
 ###############################################################################
 # Code to handle help menu and man page
@@ -46,7 +100,7 @@ pod2usage("\$0: No files given.")  if ((@ARGV == 0) && (-t STDIN));
 ###############################################################################
 @ARGV = map \{ s/(.*\\.gz)\\s*\$/pigz -dc < \$1|/; s/(.*\\.bz2)\\s*\$/pbzip2 -dc < \$1|/;\$_ } @ARGV;
 ###############################################################################
-# $1.pl
+# $1
 ###############################################################################
 
 $0
@@ -57,11 +111,11 @@ $0
 
 =head1 NAME
 
-$1.pl - $2
+$1 - $2
 
 =head1 SYNOPSIS
 
-$1.pl [options] [file ...]
+$1 [options] [file ...]
 
 Options:
       -help
@@ -83,8 +137,8 @@ Prints the manual page and exits.
 
 =head1 DESCRIPTION
 
-B<$1.pl> $2
+B<$1> $2
 
 =cut
-
+`!v system("chmod ug+x " . shellescape(expand('%')))``!p vim.command(":write!")`
 endsnippet

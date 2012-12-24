@@ -7,7 +7,7 @@ export MANPATH=`manpath`:$HOME/share/man
 
 #set perl environment variables
 eval $(perl -I /SerreDLab/hesterj/perl5/lib/perl5 -Mlocal::lib=/SerreDLab/hesterj/perl5)
-PERL_CPANM_OPT="--notest"
+export PERL_CPANM_OPT="--notest"
 
 #history base for per directory history
-HISTORY_BASE=/SerreDLab/hesterj/.directory_history
+export HISTORY_BASE=/SerreDLab/hesterj/.directory_history
