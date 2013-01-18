@@ -1,5 +1,13 @@
 extends perl
 
+snippet bench "benchmark using cmpthese"
+use Benchmark qw(cmpthese);
+
+cmpthese(${1:1000}, {
+  '${2:name}' => sub { $0 },
+});
+endsnippet
+
 snippet filebar "Use FileBar to make a file progress bar"
 use FileBar;
 my $bar = FileBar->new($0);
@@ -82,7 +90,7 @@ use strict;
 # By Jim Hester
 # Created: TIMESTAMP
 # Last Modified: TIMESTAMP
-# Title:${1:`!v bufname("%")`}
+# Title:${1:`!v fnamemodify(bufname("%"),":t")`}
 # Purpose:${2:Description}
 ###############################################################################
 # Code to handle help menu and man page
@@ -141,4 +149,12 @@ B<$1> $2
 
 =cut
 `!v system("chmod ug+x " . shellescape(expand('%')))``!p vim.command(":write!")`
+endsnippet
+
+snippet mys "declare a scalar variable"
+my $${2:adjective}${2/.+/_/}${1:noun}${3/.+/ = /}${3:value};
+endsnippet
+
+snippet mya "declare an array variable"
+my @${1:items}${2/.+/ = qw\(/}${2:value}${2/.+/\)/};
 endsnippet

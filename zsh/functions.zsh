@@ -41,3 +41,6 @@ function rif() { #run the commands only if the input file is newer than the
     eval "$@"
   fi 
 }
+
+#include prll script
+source $(dirname $0)/prll.sh
