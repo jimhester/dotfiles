@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2013 Jan 18 09:21:47 AM
+"   Modified: 2013 Jan 18 01:11:15 PM
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -13,14 +13,9 @@
         " This allows all vim plugins to be stored in individual subdirectories 
         " of the vim runtime 'bundles' subdirectory. See pathogen docs for 
         " details.
-        " filetype off
-        "runtime! autoload/pathogen.vim
-        "call pathogen#runtime_append_all_bundles()
-        "call pathogen#helptags()
-        call pathogen#infect()
-        filetype plugin indent on
-        " comment out the following to activate the haskell conceal plugin
-        "let g:no_haskell_conceal = 1
+
+        source ~/.vim/bundles.vim
+
     " }}}
     " Filetype Settings     {{{
     " ------------------------------------------------------------------
@@ -41,7 +36,7 @@
         set directory=$DATA_PATH/vim/swap//   " swap files
         set undofile  " use persistent undofile
         set undodir=$DATA_PATH/vim/undo//     " undo files
-        "set autochdir " always switch to the current file's dir
+        set autochdir " always switch to the current file's dir
     " }}}
     " Environment           {{{
     " ------------------------------------------------------------------
@@ -234,6 +229,10 @@
         endfunction
         set foldtext=MyFoldText()
         set foldlevel=100
+
+        " map leader z to toggle folding
+        nnoremap <leader>z za
+        vnoremap <leader>z za
     " }}}
 " }}}
 " Text Formatting/Layout    {{{
@@ -341,24 +340,6 @@
         " make Y conform to C/D conventions and act on cursor-to-eol
         nnoremap Y y$
     " }}}
-    " Highlighting          {{{
-    " ------------------------------------------------------------------
-        " Syntax              {{{
-        " Show syntax highlighting groups for word under cursor
-        nmap <C-S-P> :call <SID>SynStack()<CR>
-        function! <SID>SynStack()
-            if !exists("*synstack")
-                return
-            endif
-            echo map(synstack(line('.'), col('.')), 'synIDattr(v:val, "name")')
-        endfunc
-        " }}}
-        " Hex Colors        {{{
-        if exists('*HexHighlight()')
-            nmap <leader>h :call HexHighlight()<Return>
-        endif
-        " }}}
-    " }}}
     " Mouse                 {{{
     " ------------------------------------------------------------------
       set mouse=a
@@ -443,6 +424,17 @@
         au CursorMovedI,InsertLeave * if pumvisible() == 0|silent! pclose|endif
         set completeopt=menuone,menu,longest,preview"
         set ofu=syntaxcomplete#Complete
+
+        autocmd FileType *
+            \ if &omnifunc != '' |
+            \   call SuperTabChain(&omnifunc, "<c-p>") |
+            \   call SuperTabSetDefaultCompletionType("<c-x><c-u>") |
+            \ endif
+
+        "supertab
+        "let g:SuperTabContextDefaultCompletionType="<c-p>"
+        "let g:SuperTabDefaultCompletionType = "<C-X><C-O>"
+        "let g:SuperTabDefaultCompletionType = "context"
     " }}}"
     " Perl                  {{{
     " ------------------------------------------------------------------
@@ -451,8 +443,8 @@
         vnoremap <silent> <leader>t :!perltidy -q<enter>
 
         "to deparse code"
-        nnoremap <silent> <leader>d :.!perl -mo=deparse 2>/dev/null<cr>
-        vnoremap <silent> <leader>d :!perl -mo=deparse 2>/dev/null<cr>
+        nnoremap <silent> <leader>p :.!perl -mo=deparse 2>/dev/null<cr>
+        vnoremap <silent> <leader>p :!perl -mo=deparse 2>/dev/null<cr>
 
         let perl_include_pod   = 1    "include pod.vim syntax file with perl.vim"
         let perl_extended_vars = 1    "highlight complex expressions such as @{[$x, $y]}"
@@ -474,53 +466,45 @@
         let OmniCpp_MayCompleteScope = 1 " autocomplete after ::
         let OmniCpp_DefaultNamespaces = ["std", "_GLIBCXX_STD"]
     "}}}
+    " R"                  {{{
+    " ------------------------------------------------------------------
+      "Vim-R
+      "do not allow insert mode commands
+      let g:vimrplugin_insert_mode_cmds = 0
+      let vimrplugin_notmuxconf = 1
+      imap <c-r> <Plug>RCompleteArgs
 
-autocmd FileType *
-    \ if &omnifunc != '' |
-    \   call SuperTabChain(&omnifunc, "<c-p>") |
-    \   call SuperTabSetDefaultCompletionType("<c-x><c-u>") |
-    \ endif
-
-"supertab
-"let g:SuperTabContextDefaultCompletionType="<c-p>"
-"let g:SuperTabDefaultCompletionType = "<C-X><C-O>"
-"let g:SuperTabDefaultCompletionType = "context"
-
-nnoremap <Leader>x yyp:.!bash<Enter> 
-"let vimrplugin_notmuxconf = 0
-
-"Vim-R
-"do not allow insert mode commands
-let g:vimrplugin_insert_mode_cmds = 0
-let vimrplugin_notmuxconf = 1
-imap <c-r> <Plug>RCompleteArgs
-
-map <silent> <LocalLeader>h :call RAction("head")<CR>
-map <silent> <LocalLeader>le :call RAction("levels")<CR>
-map <silent> <LocalLeader>di :call RAction("dim")<CR>
-nnoremap <silent> <Space>kk :call RMakeHTML_2()<CR>
-let vimrplugin_underscore = 0
-let g:vimrplugin_openhtml = 1
-function! RMakeHTML_2()
-    call RKnit()
-    let filename = expand("%:t:r")
-    let filename_md = filename .'.md'
-    let filename_html = filename .'.html'
-    let rcmd = 'system("fix_markdown '. filename_md .';pandoc -s --self-contained --toc -H ~/share/buttondown.css ' . filename_md . ' -o ' . filename_html . '")'
-    if g:vimrplugin_openhtml
-        let rcmd = rcmd . '; browseURL("' . expand("%:r:t") . '.html")'
-    endif
-    call SendCmdToR(rcmd)
-endfunction
-
-
+      map <silent> <LocalLeader>h :call RAction("head")<CR>
+      map <silent> <LocalLeader>le :call RAction("levels")<CR>
+      map <silent> <LocalLeader>i :call RAction("dim")<CR>
+      nnoremap <silent> <Space>kk :call RMakeHTML_2()<CR>
+      let vimrplugin_underscore = 0
+      let g:vimrplugin_openhtml = 1
+      function! RMakeHTML_2()
+          call RKnit()
+          let filename = expand("%:t:r")
+          let filename_md = filename .'.md'
+          let filename_html = filename .'.html'
+          let rcmd = 'system("fix_markdown '. filename_md .';pandoc -s --self-contained --toc -H ~/share/buttondown.css ' . filename_md . ' -o ' . filename_html . '")'
+          if g:vimrplugin_openhtml
+              let rcmd = rcmd . '; browseURL("' . expand("%:r:t") . '.html")'
+          endif
+          call SendCmdToR(rcmd)
+      endfunction
+      "let vimrplugin_notmuxconf = 0
+    "}}}
+    " Misc" "{{{
+      "run in bash
+      nnoremap <Leader>x yyp:.!bash<Enter> 
+    "}}}
+    " Gundo"{{{
+      nnoremap <F5> :GundoToggle<CR>
+    "}}}
 let g:UltSnipsExpandTrigger="<tab>"
 let g:UltiSnipsJumpForwardTrigger="<tab>"
 let g:UltiSnipsJumpBackwardTrigger="<s-tab>"
 let g:UltiSnipsListSnippets="<c-l>"
 
-"gundo
-nnoremap <F5> :GundoToggle<CR>
 "
 "toggle spell checking with F7 like word
 nn <F7> :setlocal spell! spell?<CR> 
@@ -541,7 +525,7 @@ nnoremap <leader>w <C-w>v<C-w>l
 
 " make default delete not add to the yanked stack
 nnoremap <leader>d d
-nnoremap <leader>d d
+vnoremap <leader>d d
 nnoremap <silent> d "_d
 vnoremap <silent> d "_d
 
@@ -549,6 +533,3 @@ vnoremap <silent> d "_d
 " replace)
 nnoremap <leader>s :%s#\<<C-r>=expand("<cword>")<CR>\>#
 
-" Folding, map leader to toggle folding
-nnoremap <leader>z za
-vnoremap <leader>z za

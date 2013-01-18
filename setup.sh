@@ -20,3 +20,8 @@ backup ~/.perltidyrc; ln -s ~/dotfiles/perl/perltidyrc ~/.perltidyrc
 git config --global core.excludesfile ~/dotfiles/.gitignore
 git config --global user.name "Jim Hester"
 git config --global user.email "james.f.hester@gmail.com"
+
+#get all submodules
+git submodule init && git submodule update
+
+vim -u vim/bundles.vim +BundleInstall +q
