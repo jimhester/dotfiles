@@ -33,14 +33,10 @@ function psave() { #save a file, printing the first 11 lines
   tee $file 2> /dev/null | head -n $lines  | cut -c -$width
   trap SIGPIPE #unset the trap
 }
-function rif() { #run the commands only if the input file is newer than the 
-                #output file, input than output
+#newer if first is newer than output, or output is empty
+#the default newer command doesn't test for empty files
+function nwr(){
   local input=$1;shift
   local output=$1;shift
-  if [[ ! -e $output || $input -nt $output ]]; then
-    eval "$@"
-  fi 
+  [[ ! -s $output || $input -nt $output ]]
 }
-
-#include prll script
-source $(dirname $0)/prll.sh

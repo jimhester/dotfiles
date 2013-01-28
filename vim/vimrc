@@ -2,89 +2,89 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2013 Jan 18 01:11:15 PM
+"   Modified: 2013 Jan 21 11:36:17 AM
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
-" Environment               {{{
+" Environment             {{{
 " ----------------------------------------------------------------------
-    " Setup Bundle Support  {{{
-    " ------------------------------------------------------------------
-        " This allows all vim plugins to be stored in individual subdirectories 
-        " of the vim runtime 'bundles' subdirectory. See pathogen docs for 
-        " details.
+  " Setup Bundle Support  {{{
+  " ------------------------------------------------------------------
+      " This allows all vim plugins to be stored in individual subdirectories 
+      " of the vim runtime 'bundles' subdirectory. See pathogen docs for 
+      " details.
 
-        source ~/.vim/bundles.vim
+      source ~/.vim/bundles.vim
 
-    " }}}
-    " Filetype Settings     {{{
-    " ------------------------------------------------------------------
-    " }}}
-    " Colors                {{{
-    " ------------------------------------------------------------------
-        let g:solarized_visibility="low"
-        let g:solarized_termtrans=1
-        syntax enable               " syntax highlighting on
-        set background=light
-        colorscheme solarized       " detects background value (light/dark)
-    " }}}
-    " Directories           {{{
-    " ------------------------------------------------------------------
-        " backup and swap directories rely on variable set in zshenv
-        set backup                  " enable backups
-        set backupdir=$DATA_PATH/vim/backup// " backups
-        set directory=$DATA_PATH/vim/swap//   " swap files
-        set undofile  " use persistent undofile
-        set undodir=$DATA_PATH/vim/undo//     " undo files
-        set autochdir " always switch to the current file's dir
-    " }}}
-    " Environment           {{{
-    " ------------------------------------------------------------------
-        set nocompatible            " explicitly leave vi-compatibility mode
-        "set encoding=utf-8          " unicode encoding by default
-        set title                   " show title in terminal
-        "set clipboard+=unnamed      " unnamed buffer set to gui register *
-                                    " so that dd == "*dd
-        set clipboard=autoselect,exclude:.* " set clipboard to exclude all 
-                                    " so I don't have to set -X when I don't 
-                                    " have a term
-        set hidden                  " buffers hidden, not closed, when abandoned
-        set undoreload=10000
-                                    " save the whole buffer for undo when
-                                    " reloading it.  This applies to the ":e!"
-                                    " command and reloading for when the buffer
-                                    " buffer changed outside of Vim.
-        set noexrc                  " don't use local version of .(g)vimrc, .exrc
-    " }}}
-    " Compatible Options    {{{
-    " ------------------------------------------------------------------
-        set cpoptions=aABceFsmq
-        "             |||||||||
-        "             ||||||||`---- When joining lines, leave the cursor 
-        "             ||||||||      between joined lines
-        "             ||||||||
-        "             |||||||`----- When a new match is created (showmatch) 
-        "             |||||||       pause for .5
-        "             |||||||
-        "             ||||||`------ Set buffer options when entering the buffer
-        "             ||||||
-        "             |||||`------- :write command updates current file name
-        "             |||||
-        "             ||||`-------- Automatically add <CR> to the last line 
-        "             ||||          when using :@r
-        "             ||||
-        "             |||`--------- Searching continues at the end of the match 
-        "             |||           at the cursor position
-        "             |||
-        "             ||`---------- A backslash has no special meaning in
-        "             ||            mappings
-        "             ||
-        "             |`----------- :write updates alternative file name
-        "             |
-        "             `------------ :read updates alternative file name
-    " }}}
-    " }}}
-" Vim UI                    
+  " }}}
+  " Filetype Settings     {{{
+  " ------------------------------------------------------------------
+  " }}}
+  " Colors                {{{
+  " ------------------------------------------------------------------
+      let g:solarized_visibility="low"
+      let g:solarized_termtrans=1
+      syntax enable               " syntax highlighting on
+      set background=light
+      colorscheme solarized       " detects background value (light/dark)
+  " }}}
+  " Directories           {{{
+  " ------------------------------------------------------------------
+      " backup and swap directories rely on variable set in zshenv
+      set backup                  " enable backups
+      set backupdir=$DATA_PATH/vim/backup// " backups
+      set directory=$DATA_PATH/vim/swap//   " swap files
+      set undofile  " use persistent undofile
+      set undodir=$DATA_PATH/vim/undo//     " undo files
+      set autochdir " always switch to the current file's dir
+  " }}}
+  " Environment           {{{
+  " ------------------------------------------------------------------
+      set nocompatible            " explicitly leave vi-compatibility mode
+      "set encoding=utf-8          " unicode encoding by default
+      set title                   " show title in terminal
+      "set clipboard+=unnamed      " unnamed buffer set to gui register *
+                                  " so that dd == "*dd
+      set clipboard=autoselect,exclude:.* " set clipboard to exclude all 
+                                  " so I don't have to set -X when I don't 
+                                  " have a term
+      set hidden                  " buffers hidden, not closed, when abandoned
+      set undoreload=10000
+                                  " save the whole buffer for undo when
+                                  " reloading it.  This applies to the ":e!"
+                                  " command and reloading for when the buffer
+                                  " buffer changed outside of Vim.
+      set noexrc                  " don't use local version of .(g)vimrc, .exrc
+  " }}}
+  " Compatible Options    {{{
+  " ------------------------------------------------------------------
+      set cpoptions=aABceFsmq
+      "             |||||||||
+      "             ||||||||`---- When joining lines, leave the cursor 
+      "             ||||||||      between joined lines
+      "             ||||||||
+      "             |||||||`----- When a new match is created (showmatch) 
+      "             |||||||       pause for .5
+      "             |||||||
+      "             ||||||`------ Set buffer options when entering the buffer
+      "             ||||||
+      "             |||||`------- :write command updates current file name
+      "             |||||
+      "             ||||`-------- Automatically add <CR> to the last line 
+      "             ||||          when using :@r
+      "             ||||
+      "             |||`--------- Searching continues at the end of the match 
+      "             |||           at the cursor position
+      "             |||
+      "             ||`---------- A backslash has no special meaning in
+      "             ||            mappings
+      "             ||
+      "             |`----------- :write updates alternative file name
+      "             |
+      "             `------------ :read updates alternative file name
+  " }}}
+" }}}
+" Vim UI                    {{{
 " ----------------------------------------------------------------------
     " Insert Mode           {{{
     " ------------------------------------------------------------------
@@ -123,6 +123,7 @@
     " ------------------------------------------------------------------
         set nostartofline       " cursor can stay on blank characters
         set scrolloff=5         " keep 10 lines (top/bottom) for scope 
+    " }}}
     " Completion            {{{
     " ------------------------------------------------------------------
          set complete-=i        " turn of recursive includes by default
@@ -231,8 +232,8 @@
         set foldlevel=100
 
         " map leader z to toggle folding
-        nnoremap <leader>z za
-        vnoremap <leader>z za
+        nnoremap <Leader>z za
+        vnoremap <Leader>z za
     " }}}
 " }}}
 " Text Formatting/Layout    {{{
@@ -316,220 +317,234 @@
         " 1 +   Don't break a line after a one-letter word. It's broken before
         "       it instead (if possible).
     " }}}
-    " }}}
-" Maps & Functions          
+" }}}
+" Maps & Functions          {{{
 " ----------------------------------------------------------------------
-    " Colemak               {{{
-        source ~/.colemak/vimrc
-    "}}}"
-    " Leader/nops/escape    {{{
-    " ------------------------------------------------------------------
-        " redefine leader from default backslash
-        let mapleader = "\<Space>"
-        let maplocalleader = "\<Space>"
-        " turn off manual key
-        nnoremap K <nop>
+  " Colemak               {{{
+      source ~/.colemak/vimrc
+      let g:LustyJugglerKeyboardLayout = "colemak"
+  "}}}"
+  " Leader/nops/escape    {{{
+  " ------------------------------------------------------------------
+      " redefine leader from default backslash
+      let mapleader = "\<Space>"
+      let maplocalleader = "\<Space>"
+      " turn off manual key
+      nnoremap K <nop>
+  " }}}
+  " Search, Copy, Replace {{{
+  " ------------------------------------------------------------------
+      " kill search highlight with leader-slash
+      noremap <leader>/ :noh<CR>
+      " immediately enter very-magic mode when searching
+      nnoremap / /\v
+      vnoremap / /\v
+      " make Y conform to C/D conventions and act on cursor-to-eol
+      nnoremap Y y$
+  " }}}
+  " Mouse                 {{{
+  " ------------------------------------------------------------------
+    set mouse=a
     " }}}
-    " Search, Copy, Replace {{{
-    " ------------------------------------------------------------------
-        " kill search highlight with leader-slash
-        map <leader>/ :noh<cr>
-        " immediately enter very-magic mode when searching
-        nnoremap / /\v
-        vnoremap / /\v
-        " make Y conform to C/D conventions and act on cursor-to-eol
-        nnoremap Y y$
-    " }}}
-    " Mouse                 {{{
-    " ------------------------------------------------------------------
-      set mouse=a
-      " }}}
-    " Toggle Indicators     {{{
-    " ------------------------------------------------------------------
-    " We'll use &number and &relativenumber (mutually eclusive) as proxies for 
-    " the toggle state of all our preferred indicator UI
-        function! ToggleIndicators()
-            if (&number || &relativenumber) " turn off indicators
-                set nolist
-                let b:IndicatorNumber = 0
-                let b:IndicatorRelativeNumber = 0
-                let b:IndicatorCursorColumn = 0
-                let b:IndicatorCursorLine = 0
-                let b:IndicatorColorColumn = 0
-                let b:IndicatorLastStatus = 0
-                if &number
-                    let b:IndicatorNumber = 1
-                    set nonumber
-                else " must be relativenumber
-                    let b:IndicatorRelativeNumber = 1
-                    set norelativenumber
-                endif
-                if &cursorcolumn==1
-                    let b:IndicatorCursorColumn = 1
-                    set nocursorcolumn
-                endif
-                if &cursorline
-                    let b:IndicatorCursorLine = 1
-                    set nocursorline
-                endif
-                if &colorcolumn > 0
-                    let b:IndicatorColorColumn = &colorcolumn
-                    set colorcolumn=0
-                endif
-                if &laststatus > 0
-                    let b:IndicatorLastStatus = &laststatus
-                    set laststatus=0
-                endif
-            else                            " turn on indicators
-                set list
-                if b:IndicatorNumber
-                    set number
-                else " must be relativenumber
-                    set relativenumber
-                endif
-                if b:IndicatorCursorColumn
-                    set cursorcolumn
-                endif
-                if b:IndicatorCursorLine
-                    set cursorline
-                endif
-                if b:IndicatorColorColumn > 0
-                    exe "set colorcolumn=" . b:IndicatorColorColumn
-                endif
-                if b:IndicatorLastStatus > 0
-                    exe "set laststatus=" . b:IndicatorLastStatus
-                endif
-            endif
-        endfunction
-        nnoremap <F3> :call ToggleIndicators()<CR>
-        inoremap <F3> <ESC>:call ToggleIndicators()<CR>a
-        vnoremap <F3> <ESC>:call ToggleIndicators()<CR>
-    " }}}
-    " Toggle CursorColumn   {{{
-        nnoremap <F4> :set invcursorcolumn<CR>
-        inoremap <F4> <ESC>:set invcursorcolumn<CR>a
-        vnoremap <F4> <ESC>:set invcursorcolumn<CR>
-    " }}}
-    " Timestamp             {{{
-    " ------------------------------------------------------------------
-      let g:timestamp_username="Jim Hester"
-      let g:timestamp_modelines=15
-      let g:timestamp_rep='%Y %b %d %r'
-      let g:timestamp_regexp='\v\c%(<%(last )?%(changed?|modified):\s+)@<=%(\d{4}.*$?)|TIMESTAMP.*$'
-    " }}}
-    " Completion            {{{
-    " ------------------------------------------------------------------
-    "TODO fix completion"
-        " automatically open and close the popup menu / preview window
-        au CursorMovedI,InsertLeave * if pumvisible() == 0|silent! pclose|endif
-        set completeopt=menuone,menu,longest,preview"
-        set ofu=syntaxcomplete#Complete
-
-        autocmd FileType *
-            \ if &omnifunc != '' |
-            \   call SuperTabChain(&omnifunc, "<c-p>") |
-            \   call SuperTabSetDefaultCompletionType("<c-x><c-u>") |
-            \ endif
-
-        "supertab
-        "let g:SuperTabContextDefaultCompletionType="<c-p>"
-        "let g:SuperTabDefaultCompletionType = "<C-X><C-O>"
-        "let g:SuperTabDefaultCompletionType = "context"
-    " }}}"
-    " Perl                  {{{
-    " ------------------------------------------------------------------
-        "to tidy the code"
-        nnoremap <silent> <leader>t :%!perltidy -q<enter>
-        vnoremap <silent> <leader>t :!perltidy -q<enter>
-
-        "to deparse code"
-        nnoremap <silent> <leader>p :.!perl -mo=deparse 2>/dev/null<cr>
-        vnoremap <silent> <leader>p :!perl -mo=deparse 2>/dev/null<cr>
-
-        let perl_include_pod   = 1    "include pod.vim syntax file with perl.vim"
-        let perl_extended_vars = 1    "highlight complex expressions such as @{[$x, $y]}"
-        let perl_sync_dist     = 250  "use more context for highlighting"
-    " }}}
-    " C++"                 {{{
-    " ------------------------------------------------------------------
-        set tags+=~/.vim/tags/cpp
-        set tags+=~/.vim/tags/qt
-        map <C-F12> :!ctags -R --sort=yes --c++-kinds=+p --fields=+iaS --extra=+q .<CR>
-
-        "OmniCppComplete
-        let OmniCpp_NamespaceSearch = 1
-        let OmniCpp_GlobalScopeSearch = 1
-        let OmniCpp_ShowAccess = 1
-        let OmniCpp_ShowPrototypeInAbbr = 1 " show function parameters
-        let OmniCpp_MayCompleteDot = 1 " autocomplete after .
-        let OmniCpp_MayCompleteArrow = 1 " autocomplete after ->
-        let OmniCpp_MayCompleteScope = 1 " autocomplete after ::
-        let OmniCpp_DefaultNamespaces = ["std", "_GLIBCXX_STD"]
-    "}}}
-    " R"                  {{{
-    " ------------------------------------------------------------------
-      "Vim-R
-      "do not allow insert mode commands
-      let g:vimrplugin_insert_mode_cmds = 0
-      let vimrplugin_notmuxconf = 1
-      imap <c-r> <Plug>RCompleteArgs
-
-      map <silent> <LocalLeader>h :call RAction("head")<CR>
-      map <silent> <LocalLeader>le :call RAction("levels")<CR>
-      map <silent> <LocalLeader>i :call RAction("dim")<CR>
-      nnoremap <silent> <Space>kk :call RMakeHTML_2()<CR>
-      let vimrplugin_underscore = 0
-      let g:vimrplugin_openhtml = 1
-      function! RMakeHTML_2()
-          call RKnit()
-          let filename = expand("%:t:r")
-          let filename_md = filename .'.md'
-          let filename_html = filename .'.html'
-          let rcmd = 'system("fix_markdown '. filename_md .';pandoc -s --self-contained --toc -H ~/share/buttondown.css ' . filename_md . ' -o ' . filename_html . '")'
-          if g:vimrplugin_openhtml
-              let rcmd = rcmd . '; browseURL("' . expand("%:r:t") . '.html")'
+  " Toggle Indicators     {{{
+  " ------------------------------------------------------------------
+  " We'll use &number and &relativenumber (mutually eclusive) as proxies for 
+  " the toggle state of all our preferred indicator UI
+      function! ToggleIndicators()
+          if (&number || &relativenumber) " turn off indicators
+              set nolist
+              let b:IndicatorNumber = 0
+              let b:IndicatorRelativeNumber = 0
+              let b:IndicatorCursorColumn = 0
+              let b:IndicatorCursorLine = 0
+              let b:IndicatorColorColumn = 0
+              let b:IndicatorLastStatus = 0
+              if &number
+                  let b:IndicatorNumber = 1
+                  set nonumber
+              else " must be relativenumber
+                  let b:IndicatorRelativeNumber = 1
+                  set norelativenumber
+              endif
+              if &cursorcolumn==1
+                  let b:IndicatorCursorColumn = 1
+                  set nocursorcolumn
+              endif
+              if &cursorline
+                  let b:IndicatorCursorLine = 1
+                  set nocursorline
+              endif
+              if &colorcolumn > 0
+                  let b:IndicatorColorColumn = &colorcolumn
+                  set colorcolumn=0
+              endif
+              if &laststatus > 0
+                  let b:IndicatorLastStatus = &laststatus
+                  set laststatus=0
+              endif
+          else                            " turn on indicators
+              set list
+              if b:IndicatorNumber
+                  set number
+              else " must be relativenumber
+                  set relativenumber
+              endif
+              if b:IndicatorCursorColumn
+                  set cursorcolumn
+              endif
+              if b:IndicatorCursorLine
+                  set cursorline
+              endif
+              if b:IndicatorColorColumn > 0
+                  exe "set colorcolumn=" . b:IndicatorColorColumn
+              endif
+              if b:IndicatorLastStatus > 0
+                  exe "set laststatus=" . b:IndicatorLastStatus
+              endif
           endif
-          call SendCmdToR(rcmd)
       endfunction
-      "let vimrplugin_notmuxconf = 0
-    "}}}
-    " Misc" "{{{
-      "run in bash
-      nnoremap <Leader>x yyp:.!bash<Enter> 
-    "}}}
-    " Gundo"{{{
-      nnoremap <F5> :GundoToggle<CR>
-    "}}}
-let g:UltSnipsExpandTrigger="<tab>"
-let g:UltiSnipsJumpForwardTrigger="<tab>"
-let g:UltiSnipsJumpBackwardTrigger="<s-tab>"
-let g:UltiSnipsListSnippets="<c-l>"
+      nnoremap <F3> :call ToggleIndicators()<CR>
+      inoremap <F3> <ESC>:call ToggleIndicators()<CR>a
+      vnoremap <F3> <ESC>:call ToggleIndicators()<CR>
+  " }}}
+  " Toggle CursorColumn   {{{
+      nnoremap <F4> :set invcursorcolumn<CR>
+      inoremap <F4> <ESC>:set invcursorcolumn<CR>a
+      vnoremap <F4> <ESC>:set invcursorcolumn<CR>
+  " }}}
+  " Timestamp             {{{
+  " ------------------------------------------------------------------
+    let g:timestamp_username="Jim Hester"
+    let g:timestamp_modelines=15
+    let g:timestamp_rep='%Y %b %d %r'
+    let g:timestamp_regexp='\v\c%(<%(last )?%(changed?|modified):\s+)@<=%(\d{4}.*$?)|TIMESTAMP.*$'
+  " }}}
+  " Completion            {{{
+  " ------------------------------------------------------------------
+  "TODO fix completion"
+      " automatically open and close the popup menu / preview window
+      au CursorMovedI,InsertLeave * if pumvisible() == 0|silent! pclose|endif
+      set completeopt=menuone,menu,longest,preview"
+      set ofu=syntaxcomplete#Complete
 
-"
-"toggle spell checking with F7 like word
-nn <F7> :setlocal spell! spell?<CR> 
-"table header
-nnoremap <F8> yyP:s/\v\S.{-}\ze(\s{2}\S\|$)/\=substitute(submatch(0),'.','-','g')/g<CR>
-set pastetoggle=<F6>
+      autocmd FileType *
+          \ if &omnifunc != '' |
+          \   call SuperTabChain(&omnifunc, "<c-p>") |
+          \   call SuperTabSetDefaultCompletionType("<c-x><c-u>") |
+          \ endif
 
-"remap semicolon and colon to make getting to ex mode faster
-nnoremap ; :
-nnoremap : ;
+      "supertab
+      "let g:SuperTabContextDefaultCompletionType="<c-p>"
+      "let g:SuperTabDefaultCompletionType = "<C-X><C-O>"
+      "let g:SuperTabDefaultCompletionType = "context"
+  " }}}"
+  " Perl                  {{{
+  " ------------------------------------------------------------------
+      "to tidy the code"
+      nnoremap <silent> <leader>t :%!perltidy -q<enter>
+      vnoremap <silent> <leader>t :!perltidy -q<enter>
 
-" Easy window navigation
-noremap <C-h> <C-w>h
-noremap <C-n> <C-w>j
-noremap <C-e> <C-w>k
-noremap <C-i> <C-w>l
-nnoremap <leader>w <C-w>v<C-w>l
+      "to deparse code"
+      nnoremap <silent> <leader>p :.!perl -mo=deparse 2>/dev/null<cr>
+      vnoremap <silent> <leader>p :!perl -mo=deparse 2>/dev/null<cr>
 
-" make default delete not add to the yanked stack
-nnoremap <leader>d d
-vnoremap <leader>d d
-nnoremap <silent> d "_d
-vnoremap <silent> d "_d
+      let perl_include_pod   = 1    "include pod.vim syntax file with perl.vim"
+      let perl_extended_vars = 1    "highlight complex expressions such as @{[$x, $y]}"
+      let perl_sync_dist     = 250  "use more context for highlighting"
+  " }}}
+  " C++                 {{{
+  " ------------------------------------------------------------------
+      set tags+=~/.vim/tags/cpp
+      set tags+=~/.vim/tags/qt
+      map <C-F12> :!ctags -R --sort=yes --c++-kinds=+p --fields=+iaS --extra=+q .<CR>
 
-" Pull word under cursor into LHS of a substitute (for quick search and
-" replace)
-nnoremap <leader>s :%s#\<<C-r>=expand("<cword>")<CR>\>#
+      "OmniCppComplete
+      let OmniCpp_NamespaceSearch = 1
+      let OmniCpp_GlobalScopeSearch = 1
+      let OmniCpp_ShowAccess = 1
+      let OmniCpp_ShowPrototypeInAbbr = 1 " show function parameters
+      let OmniCpp_MayCompleteDot = 1 " autocomplete after .
+      let OmniCpp_MayCompleteArrow = 1 " autocomplete after ->
+      let OmniCpp_MayCompleteScope = 1 " autocomplete after ::
+      let OmniCpp_DefaultNamespaces = ["std", "_GLIBCXX_STD"]
+  "}}}
+  " R                  {{{
+  " ------------------------------------------------------------------
+    "Vim-R
+    "do not allow insert mode commands
+    let g:vimrplugin_insert_mode_cmds = 0
+    let vimrplugin_notmuxconf = 1
+    imap <c-r> <Plug>RCompleteArgs
 
+    map <silent> <LocalLeader>h :call RAction("head")<CR>
+    map <silent> <LocalLeader>le :call RAction("levels")<CR>
+    map <silent> <LocalLeader>i :call RAction("dim")<CR>
+    nnoremap <silent> <Space>kk :call RMakeHTML_2()<CR>
+    let vimrplugin_underscore = 0
+    let g:vimrplugin_openhtml = 1
+    function! RMakeHTML_2()
+        call RKnit()
+        let filename = expand("%:t:r")
+        let filename_md = filename .'.md'
+        let filename_html = filename .'.html'
+        let rcmd = 'system("fix_markdown '. filename_md .';pandoc -s --self-contained --toc -H ~/share/buttondown.css ' . filename_md . ' -o ' . filename_html . '")'
+        if g:vimrplugin_openhtml
+            let rcmd = rcmd . '; browseURL("' . expand("%:r:t") . '.html")'
+        endif
+        call SendCmdToR(rcmd)
+    endfunction
+    "let vimrplugin_notmuxconf = 0
+  "}}}
+  " Gundo {{{
+  " ------------------------------------------------------------------
+    nnoremap <F5> :GundoToggle<CR>
+  "}}}
+  " LustyJuggler {{{
+  " ------------------------------------------------------------------
+    let g:LustyJugglerDefaultMappings = 0
+    noremap <Leader>b :LustyJuggler<CR>
+  "}}}
+  " UltiSnips {{{
+  " ------------------------------------------------------------------
+    let g:UltSnipsExpandTrigger="<tab>"
+    let g:UltiSnipsJumpForwardTrigger="<tab>"
+    let g:UltiSnipsJumpBackwardTrigger="<s-tab>"
+    let g:UltiSnipsListSnippets="<c-l>"
+  "}}}
+  " Tabify"{{{
+  " ------------------------------------------------------------------
+    "table header
+    nnoremap <F8> yyP:s/\v\S.{-}\ze(\s{2}\S\|$)/\=substitute(submatch(0),'.','-','g')/g<CR>
+    set pastetoggle=<F6>
+  "}}}
+  " Misc  {{{
+  " ------------------------------------------------------------------
+    "run in bash
+    nnoremap <Leader>x yyp:.!bash<Enter> 
+
+    " TODO rebind for yankring?
+    " make default delete not add to the yanked stack
+    "nnoremap <leader>d d
+    "vnoremap <leader>d d
+    "nnoremap <silent> d "_d
+    "vnoremap <silent> d "_d
+
+    "toggle spell checking with F7 like word
+    nn <F7> :setlocal spell! spell?<CR> 
+
+    "remap semicolon and colon to make getting to ex mode faster
+    nnoremap ; :
+    nnoremap : ;
+
+    " Easy window navigation
+    noremap <C-h> <C-w>h
+    noremap <C-n> <C-w>j
+    noremap <C-e> <C-w>k
+    noremap <C-i> <C-w>l
+    nnoremap <leader>w <C-w>v<C-w>l
+
+    " Pull word under cursor into LHS of a substitute (for quick search and
+    " replace)
+    nnoremap <leader>s :%s#\<<C-r>=expand("<cword>")<CR>\>#
+  "}}}
+"}}}

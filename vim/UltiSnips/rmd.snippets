@@ -25,8 +25,8 @@ endsnippet
 
 snippet perl "include perl script sourcecode"
 #### ${1:filename}.pl ${2:description} ####
-\`\`\`\{r engine='bash', echo=FALSE, comment='perl', cache.extra=mtime('$1.pl')\}
-strip_perl $1.pl $0
+\`\`\`\{r engine='bash', echo=FALSE, cache.extra=mtime('$1.pl')\}
+perltidy -st -dac $1.pl $0
 \`\`\`
 endsnippet
 
