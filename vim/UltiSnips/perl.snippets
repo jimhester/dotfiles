@@ -30,7 +30,7 @@ while(my $${2:align} = $$1->next_align){
 endsnippet
 
 snippet open "Open file and parse" !b
-open my $${1:in}, "${2:<}", "${3:filename}" or die "$!:Could not open $3\n";
+open my($${1:in}), "${2:<}", "${3:filename}";
 while(<$$1>){
   $0
 }
@@ -86,6 +86,7 @@ snippet start "Create a new perl script"
 #!/usr/bin/env perl
 use warnings;
 use strict;
+use autodie qw(:all);
 ###############################################################################
 # By Jim Hester
 # Created: TIMESTAMP
