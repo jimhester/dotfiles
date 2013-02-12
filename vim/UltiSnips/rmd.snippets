@@ -12,38 +12,34 @@ ${0:${VISUAL}}
 endsnippet
 
 snippet rp "R plot"
-\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title},}dev=${3:'svg'}${4: ,warning=${5:FALSE}}\}
-${0:${VISUAL}}
-\`\`\`
-endsnippet
-
-snippet zsh "R zsh shell commands"
-\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title},}engine='${3:zsh}'\}
+\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title},} dev=${3:'svg'}${4: ,warning=${5:FALSE}}\}
 ${0:${VISUAL}}
 \`\`\`
 endsnippet
 
 snippet perl "include perl script sourcecode"
-#### ${1:filename}.pl ${2:description} ####
-\`\`\`\{r engine='bash', echo=FALSE, cache.extra=mtime('$1.pl')\}
-perltidy -st -dac $1.pl $0
+#### ${1:filename}.pl ####
+\`\`\`\{r, echo=F}
+read_chunk('$1.pl', labels = '$1.pl')
+\`\`\`
+\`\`\`\{r $1.pl, engine='${2:perl}', eval=F\}
 \`\`\`
 endsnippet
 
 snippet bash "bash shell commands"
-\`\`\`\{r ${2:`!v expand("%:t:r")`_${1:Title},}engine='${3:bash}'\}
+\`\`\`\{r ${3:`!v expand("%:t:r")`_${1:Title},} engine='${2:bash}'\}
 ${0:${VISUAL}}
 \`\`\`
 endsnippet
 
 snippet start "setup caching"
 # ${1:Title} #
-\`\`\`{r ${2:`!v expand("%:t:r")`_${3:setup}},cache=FALSE,include=FALSE}
+\`\`\`{r ${2:`!v expand("%:t:r")`_${3:setup}}, cache=FALSE, include=FALSE}
 mtime <- function(files){
   sum(unlist(lapply(Sys.glob(files),function(x) file.info(x)$mtime )))
 }
 files <- c('${4}')
-opts_chunk$set(cache.extra=mtime(files),cache=TRUE,cl.opts='-l')
+opts_chunk$set(cache.extra=mtime(files), cache=TRUE, engine.opts='-l')
 \`\`\`
 $0
 Created: TIMESTAMP

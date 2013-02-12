@@ -1,5 +1,10 @@
 extends perl
 
+snippet dumper "print debug message"
+use Data::Dumper;
+warn Dumper($0);
+endsnippet
+
 snippet bench "benchmark using cmpthese"
 use Benchmark qw(cmpthese);
 
@@ -87,27 +92,19 @@ snippet start "Create a new perl script"
 use warnings;
 use strict;
 use autodie qw(:all);
+use Getopt::Euclid qw(:minimal_keys);
 ###############################################################################
 # By Jim Hester
 # Created: TIMESTAMP
 # Last Modified: TIMESTAMP
 # Title:${1:`!v fnamemodify(bufname("%"),":t")`}
-# Purpose:${2:Description}
+# Purpose:${2:short description}
 ###############################################################################
-# Code to handle help menu and man page
-###############################################################################
-use Getopt::Long;
-use Pod::Usage;
-my \$man = 0;
-my \$help = 0;
-GetOptions('help|?' => \\\$help, man => \\\$man) or pod2usage(2);
-pod2usage(2) if \$help;
-pod2usage(-verbose => 2) if \$man;
-pod2usage("\$0: No files given.")  if ((@ARGV == 0) && (-t STDIN));
-###############################################################################
-# Automatically extract compressed files
+# Automatically extract compressed files and set input and output files
 ###############################################################################
 @ARGV = map \{ s/(.*\\.gz)\\s*\$/pigz -dc < \$1|/; s/(.*\\.bz2)\\s*\$/pbzip2 -dc < \$1|/;\$_ } @ARGV;
+@ARGV = @{ $ARGV{i} };
+open my($outfh), ">$ARGV{o}";
 ###############################################################################
 # $1
 ###############################################################################
@@ -122,34 +119,49 @@ $0
 
 $1 - $2
 
-=head1 SYNOPSIS
+=head1 VERSION
 
-$1 [options] [file ...]
+0.0.1
 
-Options:
-      -help
-      -man               for more info
+=head1 USAGE
+
+    $1 [options] <file>
 
 =head1 OPTIONS
 
-=over 8
+=over
 
-=item B<-help>
+=item [-i] <infiles>... | [--in[file]] <infiles>...
 
-Print a brief help message and exits.
+Specify input file(s).
 
-=item B<-man>
+=for Euclid:
+  infiles.type: readable
+  infiles.default: '-'
 
-Prints the manual page and exits.
+=item -o <outfile> | --out[file] <outfile>
 
-=back
+Specify output file.
+
+=for Euclid:
+  outfile.type: writable
+  outfile.default: '-'
+
+=back 
 
 =head1 DESCRIPTION
 
-B<$1> $2
+B<$1> ${3:Long Description}
 
 =cut
 `!v system("chmod ug+x " . shellescape(expand('%')))``!p vim.command(":write!")`
+endsnippet
+
+snippet option "add a new command line option"
+=item -${1:name} <${2:value}>
+
+=for Euclid:
+  $2.type: ${3:number}
 endsnippet
 
 snippet mys "declare a scalar variable"
