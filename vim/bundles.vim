@@ -8,7 +8,7 @@ call vundle#rc()
   Bundle 'altercation/vim-colors-solarized'
   Bundle 'c9s/perlomni.vim'
   Bundle 'ervandew/screen'
-  Bundle 'ervandew/supertab'
+"  Bundle 'ervandew/supertab'
   Bundle 'gmarik/vundle'
   Bundle 'godlygeek/tabular'
   Bundle 'jcfaria/Vim-R-plugin'

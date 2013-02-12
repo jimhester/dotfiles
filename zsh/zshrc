@@ -45,3 +45,6 @@ source $ZSH/oh-my-zsh.sh
 HISTFILE=/SerreDLab/hesterj/.zsh_history
 HISTSIZE=1000000
 SAVEHIST=1000000
+
+#fix grep color
+unset GREP_COLOR

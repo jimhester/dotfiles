@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2013 Jan 21 11:36:17 AM
+"   Modified: 2013 Feb 12 09:43:39 AM
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -131,11 +131,25 @@
         "set wildchar=<Tab>      " type to start wildcard expansion in the
                                 " command-line (tab is default)
         set wildmenu            " command-line completion enhanced mode
-        "set wildmode=list:longest  " When more than one match, list all and
+        set wildmode=longest,list:longest  " When more than one match, list all and
                                 " complete till longest common string.
-        set wildmode=longest:full   " complete till longest common string
+        "set wildmode=longest:full   " complete till longest common string
                                 " if this doesn't result in a longer string,
                                 " use the next part (also start 'wildmenu')
+                                
+        function! CleverTab()
+          if pumvisible()
+            return "\<C-N>"
+          endif
+          if strpart( getline('.'), 0, col('.')-1 ) =~ '^\s*$'
+            return "\<Tab>"
+          elseif exists('&omnifunc') && &omnifunc != ''
+            return "\<C-X>\<C-O>"
+          else
+            return "\<C-N>"
+          endif
+        endfunction
+        inoremap <Tab> <C-R>=(UltiSnips_ExpandSnippetOrJump() > 0) ? "": CleverTab()<CR>
     " }}}
     " Status Indicators     {{{
     " ------------------------------------------------------------------
@@ -231,9 +245,6 @@
         set foldtext=MyFoldText()
         set foldlevel=100
 
-        " map leader z to toggle folding
-        nnoremap <Leader>z za
-        vnoremap <Leader>z za
     " }}}
 " }}}
 " Text Formatting/Layout    {{{
@@ -342,6 +353,13 @@
       " make Y conform to C/D conventions and act on cursor-to-eol
       nnoremap Y y$
   " }}}
+  " Folding"{{{
+  " ------------------------------------------------------------------
+        " map leader z to toggle folding
+        nnoremap <Leader>z za
+        vnoremap <Leader>z za
+  "}}}
+  "
   " Mouse                 {{{
   " ------------------------------------------------------------------
     set mouse=a
@@ -375,6 +393,9 @@
                   set nocursorline
               endif
               if &colorcolumn > 0
+        " map leader z to toggle folding
+        nnoremap <Leader>z za
+        vnoremap <Leader>z za
                   let b:IndicatorColorColumn = &colorcolumn
                   set colorcolumn=0
               endif
@@ -423,20 +444,20 @@
   " ------------------------------------------------------------------
   "TODO fix completion"
       " automatically open and close the popup menu / preview window
-      au CursorMovedI,InsertLeave * if pumvisible() == 0|silent! pclose|endif
-      set completeopt=menuone,menu,longest,preview"
-      set ofu=syntaxcomplete#Complete
+      "au CursorMovedI,InsertLeave * if pumvisible() == 0|silent! pclose|endif
+      "set completeopt=menuone,menu,longest,preview"
+      "set ofu=syntaxcomplete#Complete
 
-      autocmd FileType *
-          \ if &omnifunc != '' |
-          \   call SuperTabChain(&omnifunc, "<c-p>") |
-          \   call SuperTabSetDefaultCompletionType("<c-x><c-u>") |
-          \ endif
+      "autocmd FileType *
+      "    \ if &omnifunc != '' |
+      "    \   call SuperTabChain(&omnifunc, "<c-p>") |
+      "    \   call SuperTabSetDefaultCompletionType("<c-x><c-u>") |
+      "    \ endif
 
       "supertab
-      "let g:SuperTabContextDefaultCompletionType="<c-p>"
-      "let g:SuperTabDefaultCompletionType = "<C-X><C-O>"
-      "let g:SuperTabDefaultCompletionType = "context"
+      "      let g:SuperTabContextDefaultCompletionType="<c-p>"
+            "let g:SuperTabDefaultCompletionType = "<C-X><C-O>"
+      "      let g:SuperTabDefaultCompletionType = "context"
   " }}}"
   " Perl                  {{{
   " ------------------------------------------------------------------
@@ -506,10 +527,11 @@
   "}}}
   " UltiSnips {{{
   " ------------------------------------------------------------------
-    let g:UltSnipsExpandTrigger="<tab>"
-    let g:UltiSnipsJumpForwardTrigger="<tab>"
-    let g:UltiSnipsJumpBackwardTrigger="<s-tab>"
+    let g:UltiSnipsExpandTrigger="<Nop>"
+    let g:UltiSnipsJumpForwardTrigger="<c-n>"
+    let g:UltiSnipsJumpBackwardTrigger="<c-e>"
     let g:UltiSnipsListSnippets="<c-l>"
+
   "}}}
   " Tabify"{{{
   " ------------------------------------------------------------------
