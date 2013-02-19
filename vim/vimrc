@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2013 Feb 12 09:43:39 AM
+"   Modified: 2013 Feb 13 03:31:05 PM
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -149,7 +149,12 @@
             return "\<C-N>"
           endif
         endfunction
-        inoremap <Tab> <C-R>=(UltiSnips_ExpandSnippetOrJump() > 0) ? "": CleverTab()<CR>
+        let g:ulti_expand_or_jump_res = 0 "default value, just set once
+        function! Ulti_ExpandOrJump_and_getRes()
+          call UltiSnips_ExpandSnippetOrJump()
+          return g:ulti_expand_or_jump_res
+        endfunction
+        inoremap <Tab> <C-R>=(Ulti_ExpandOrJump_and_getRes() > 0) ? "": CleverTab()<CR>
     " }}}
     " Status Indicators     {{{
     " ------------------------------------------------------------------
@@ -527,9 +532,9 @@
   "}}}
   " UltiSnips {{{
   " ------------------------------------------------------------------
-    let g:UltiSnipsExpandTrigger="<Nop>"
-    let g:UltiSnipsJumpForwardTrigger="<c-n>"
-    let g:UltiSnipsJumpBackwardTrigger="<c-e>"
+let g:UltiSnipsExpandTrigger="<Nop>"
+    let g:UltiSnipsJumpForwardTrigger="<C-n>"
+    let g:UltiSnipsJumpBackwardTrigger="<S-Tab>"
     let g:UltiSnipsListSnippets="<c-l>"
 
   "}}}
