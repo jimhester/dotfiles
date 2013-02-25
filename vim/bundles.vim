@@ -5,6 +5,7 @@ call vundle#rc()
 "Bundles {{{
   Bundle 'SirVer/ultisnips'
   Bundle 'YankRing.vim'
+  Bundle 'chriskempson/base16-vim'
   Bundle 'altercation/vim-colors-solarized'
   Bundle 'c9s/perlomni.vim'
   Bundle 'ervandew/screen'

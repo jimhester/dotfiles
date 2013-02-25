@@ -25,3 +25,6 @@ git config --global user.email "james.f.hester@gmail.com"
 git submodule init && git submodule update
 
 vim -u vim/bundles.vim +BundleInstall +q
+
+#generate terminfo
+tic terminfo/terminfo-20120811.src

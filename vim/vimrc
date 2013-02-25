@@ -2,7 +2,7 @@
 "   Jim Hester
 "   vimrc
 "   last changed:
-"   Modified: 2013 Feb 13 03:31:05 PM
+"   Modified: 2013 Feb 22 03:20:06 PM
 "   Adapted from Ethan Schoonover's vimrc
 "   git://github.com/altercation/es-etc.git
 " ----------------------------------------------------------------------
@@ -22,11 +22,12 @@
   " }}}
   " Colors                {{{
   " ------------------------------------------------------------------
-      let g:solarized_visibility="low"
-      let g:solarized_termtrans=1
+  "    let g:solarized_visibility="low"
+  "    let g:solarized_termtrans=1
       syntax enable               " syntax highlighting on
+      set t_Co=16
       set background=light
-      colorscheme solarized       " detects background value (light/dark)
+      colorscheme base16-default
   " }}}
   " Directories           {{{
   " ------------------------------------------------------------------
