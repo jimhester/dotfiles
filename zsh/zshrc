@@ -37,10 +37,13 @@ HISTORY_BASE=/SerreDLab/hesterj/.directory_history
 # Example format: plugins=(rails git textmate ruby lighthouse)
 plugins=(vi-mode git per-directory-history history-substring-search colemak zsh-syntax-highlighting)
 
+source $ZSH/oh-my-zsh.sh
+
 bindkey '^[OA' history-substring-search-up
 bindkey '^[OB' history-substring-search-down
 
-source $ZSH/oh-my-zsh.sh
+bindkey '^E' history-substring-search-up
+bindkey '^N' history-substring-search-down
 
 HISTFILE=/SerreDLab/hesterj/.zsh_history
 HISTSIZE=1000000
@@ -48,3 +51,6 @@ SAVEHIST=1000000
 
 #fix grep color
 unset GREP_COLOR
+
+#solarized dircolors
+eval `dircolors ~/.dircolors`

@@ -1,0 +1,90 @@
+" Colors {{{
+  set background=light
+  colorscheme solarized
+" }}}
+" Colemak               {{{
+  source ~/.colemak/vimrc
+  let g:LustyJugglerKeyboardLayout = "colemak"
+"}}}"
+  " Leader/nops/escape    {{{
+  " ------------------------------------------------------------------
+  " redefine leader from default backslash
+  let maplocalleader = "\<Space>"
+"}}}
+
+" Search, Copy, Replace {{{
+" ------------------------------------------------------------------
+  " kill search highlight with leader-slash
+  noremap <leader>/ :noh<CR>
+  " map leader z to toggle folding
+  nnoremap <Leader>z za
+  vnoremap <Leader>z za
+"}}}
+" Timestamp             {{{
+" ------------------------------------------------------------------
+  let g:timestamp_username="Jim Hester"
+  let g:timestamp_modelines=15
+  let g:timestamp_rep='%Y %b %d %r'
+  let g:timestamp_regexp='\v\c%(<%(last )?%(changed?|modified):\s+)@<=%(\d{4}.*$?)|TIMESTAMP.*$'
+" }}}
+" Perl                  {{{
+" ------------------------------------------------------------------
+  "to tidy the code"
+  nnoremap <silent> <leader>t :%!perltidy -q<enter>
+  vnoremap <silent> <leader>t :!perltidy -q<enter>
+
+  let perl_include_pod   = 1    "include pod.vim syntax file with perl.vim"
+  let perl_extended_vars = 1    "highlight complex expressions such as @{[$x, $y]}"
+  let perl_sync_dist     = 250  "use more context for highlighting"
+" }}}
+" R                  {{{
+" ------------------------------------------------------------------
+  "do not allow insert mode commands
+  let g:vimrplugin_insert_mode_cmds = 0
+  let vimrplugin_notmuxconf = 1
+  let vimrplugin_underscore = 0
+  let g:vimrplugin_openhtml = 1
+
+  nnoremap <silent> <LocalLeader>h :call RAction("head")<CR>
+  nnoremap <silent> <LocalLeader>le :call RAction("levels")<CR>
+  nnoremap <silent> <LocalLeader>i :call RAction("dim")<CR>
+  nnoremap <silent> <Space>kk :call RMakeHTML_2()<CR>
+  function! RMakeHTML_2()
+      call RKnit()
+      let filename = expand("%:t:r")
+      let filename_md = filename .'.md'
+      let filename_html = filename .'.html'
+      let rcmd = 'system("fix_markdown '. filename_md .';pandoc -s --self-contained --toc -H ~/share/buttondown.css ' . filename_md . ' -o ' . filename_html . '")'
+      if g:vimrplugin_openhtml
+          let rcmd = rcmd . '; browseURL("' . expand("%:r:t") . '.html")'
+      endif
+      call SendCmdToR(rcmd)
+  endfunction
+  "}}}"
+" LustyJuggler {{{
+" ------------------------------------------------------------------
+  let g:LustyJugglerDefaultMappings = 0
+  noremap <Leader>b :LustyJuggler<CR>
+"}}}
+" Gundo {{{
+" ------------------------------------------------------------------
+  nnoremap <F5> :GundoToggle<CR>
+"}}}
+" Autoclose {{{
+" ------------------------------------------------------------------
+  " do not pair quotes when editing vim files
+  let g:autoclose_vim_commentmode = 1
+"
+" Misc Binds {{{
+" ------------------------------------------------------------------
+  "remap semicolon and colon to make getting to ex mode faster
+  nnoremap ; :
+  nnoremap : ;
+
+  set pastetoggle=<F6>
+
+  "use 2 space tabs rather than 4
+  set shiftwidth=2                " Use indents of 2 spaces
+  set tabstop=2                   " An indentation every 2 columns
+  set softtabstop=2               " Let backspace delete indent
+"}}}

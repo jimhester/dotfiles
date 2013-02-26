@@ -503,9 +503,9 @@
     let vimrplugin_notmuxconf = 1
     imap <c-r> <Plug>RCompleteArgs
 
-    map <silent> <LocalLeader>h :call RAction("head")<CR>
-    map <silent> <LocalLeader>le :call RAction("levels")<CR>
-    map <silent> <LocalLeader>i :call RAction("dim")<CR>
+    nnoremap <silent> <LocalLeader>h :call RAction("head")<CR>
+    nnoremap <silent> <LocalLeader>le :call RAction("levels")<CR>
+    nnoremap <silent> <LocalLeader>i :call RAction("dim")<CR>
     nnoremap <silent> <Space>kk :call RMakeHTML_2()<CR>
     let vimrplugin_underscore = 0
     let g:vimrplugin_openhtml = 1
