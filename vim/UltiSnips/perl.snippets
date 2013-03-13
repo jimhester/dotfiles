@@ -103,11 +103,10 @@ use autodie qw(:all);
 ###############################################################################
 use Getopt::Long;
 use Pod::Usage;
-my \$man = 0;
-my \$help = 0;
-GetOptions('help|?' => \\\$help, man => \\\$man) or pod2usage(2);
-pod2usage(2) if \$help;
-pod2usage(-verbose => 2) if \$man;
+my %args = ();
+GetOptions(\\%args, 'help|?', 'man') or pod2usage(2);
+pod2usage(2) if exists \$args{help};
+pod2usage(-verbose => 2) if exists \$args{man};
 pod2usage("\$0: No files given.")  if ((@ARGV == 0) && (-t STDIN));
 ###############################################################################
 # Automatically extract compressed files
