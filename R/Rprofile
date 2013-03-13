@@ -30,5 +30,10 @@ if(interactive()){
 #    options(pager = "gvim -c 'set ft=rdoc' -")
   }
   require(ggplot2)
+
+  #use white backgrounds
   theme_set(theme_bw())
+
+  #use color brewer as default discrete colors
+  scale_colour_discrete <- function(...) scale_color_brewer(palette="Set1", ...)
 }
