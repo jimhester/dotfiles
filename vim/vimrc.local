@@ -51,12 +51,11 @@
   nnoremap <silent> <Space>kk :call RMakeHTML_2()<CR>
   function! RMakeHTML_2()
       call RKnit()
-      let filename = expand("%:t:r")
-      let filename_md = filename .'.md'
-      let filename_html = filename .'.html'
-      let rcmd = 'system("fix_markdown '. filename_md .';pandoc -s --self-contained --toc -H ~/share/buttondown.css ' . filename_md . ' -o ' . filename_html . '")'
+      let filename = expand("%:r:t")
+      "requires my patch to markdownToHTML
+      let rcmd = "knit2html(stylesheet='~/share/knitr_bootstrap.css', header='~/share/knitr_bootstrap.html', '" . filename . ".Rmd', output='" . filename . ".html')"
       if g:vimrplugin_openhtml
-          let rcmd = rcmd . '; browseURL("' . expand("%:r:t") . '.html")'
+          let rcmd = rcmd . '; browseURL("' . filename . '.html")'
       endif
       call SendCmdToR(rcmd)
   endfunction

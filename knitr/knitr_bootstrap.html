@@ -1,0 +1,45 @@
+<link rel="stylesheet" href="http://yandex.st/highlightjs/7.3/styles/github.min.css">
+<link rel="stylesheet" href="http://twitter.github.com/bootstrap/assets/css/bootstrap.css" media="screen">
+<link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.9.0/themes/base/jquery-ui.css">
+<link rel="stylesheet" href="http://gregfranko.com/jquery.tocify.js/css/jquery.tocify.css">
+
+<script src="http://yandex.st/highlightjs/7.3/highlight.min.js"></script>
+<script src="http://code.jquery.com/jquery-latest.min.js"></script>
+<script src="http://code.jquery.com/ui/1.10.1/jquery-ui.js"></script>
+<script src="https://raw.github.com/gfranko/jquery.tocify.js/master/src/javascripts/jquery.tocify.min.js"></script>
+<script src="http://twitter.github.com/bootstrap/assets/js/bootstrap.min.js"></script>
+
+<script>
+
+/* run scripts when document is ready */
+$(function() {
+  /* find all code blocks which have a class (not output) and syntax highlight */
+  $('pre code[class]').each(function(i, e) {
+      hljs.highlightBlock(e);
+  });
+
+  /* Add code block toggles */
+  $('pre code[class]').parent().wrap('<div class=toggle>[+/- Code]<div/>');
+
+  /* onclick toggle next code block */
+  $('.toggle').click(function() {
+    $(this).find('code').toggle();
+  });
+
+  /* hide by default if a perl or python script code block */
+  $('pre code.perl,code.python').hide();
+
+  /* wrap images in labels to allow click zooming */
+  $('img').wrap('<label for="check" />')
+  $('img').before('<input id="check", type="checkbox"/>');
+
+  /* add bootstrap classes */
+  $('body').wrapInner('<div class="span9" />');
+  $('body').wrapInner('<div class="row-fluid" />');
+  $('body').wrapInner('<div class="container-fluid" />');
+  $('.row-fluid').prepend('<div class="span3"><div id="toc"></div></div>');
+
+  /* add table of contents */
+  $('#toc').tocify({'selectors': 'h1,h2,h3,h4', 'showAndHide' : false});
+});
+</script>

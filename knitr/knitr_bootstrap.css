@@ -1,0 +1,44 @@
+/* remove left padding on body and container */
+body {
+  margin:0;
+}
+.container-fluid {
+  padding-left: 0;
+}
+div.figure {
+  /* Center the images */
+  text-align: center;
+}
+img {
+  height: auto;
+  width: 45%;
+}
+.toggle{
+  color:#08C
+}
+/* Hide checkboxes */
+input[type=checkbox]{
+  display:none;
+}
+/* remove block setting for labels */
+label[for=check]{
+  display:inline;
+}
+input[type=checkbox]:checked + img{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  height: auto;
+  width: auto;
+  margin: auto;
+}
+
+/* indent for h4 elements */
+.sub-header .sub-header .sub-header .sub-header {
+  text-indent: 50px;
+}
+
+.sub-header{
+  display:inline;
+}
