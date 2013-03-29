@@ -6,13 +6,6 @@
 # and start a new session
 #
 
-#if(interactive()){
-#  library(colorout)
-#  library(setwidth)
-#  library(vimcom)
-#  options(pager = "vim -c 'set ft=rdoc' -") 
-#}
-
 if(interactive()){
   library(colorout)
   library(setwidth)
@@ -34,6 +27,18 @@ if(interactive()){
   #use white backgrounds
   theme_set(theme_bw())
 
+  #colorblind palette
+  cb_palette <-c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
   #use color brewer as default discrete colors
   scale_colour_discrete <- function(...) scale_color_brewer(palette="Set1", ...)
+  scale_fill_discrete <- function(...) scale_color_brewer(palette="Set1", ...)
+
+  #set Rstudio markdown function
+  options(rstudio.markdownToHTML =
+  function(inputFile, outputFile) {
+    require(markdown)
+    markdownToHTML(inputFile, outputFile, stylesheet='~/share/knitr_bootstrap.css', header='~/share/knitr_bootstrap.html')
+  }
+)
 }
