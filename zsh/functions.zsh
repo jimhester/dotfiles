@@ -40,3 +40,8 @@ function nwr(){
   local output=$1;shift
   [[ ! -s $output || $input -nt $output ]]
 }
+
+#note have to pipe into grep_header
+function grep_header(){
+  read line; echo "$line"; grep "$@"
+}
