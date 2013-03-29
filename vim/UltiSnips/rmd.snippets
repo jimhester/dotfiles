@@ -12,7 +12,7 @@ ${0:${VISUAL}}
 endsnippet
 
 snippet rp "R plot"
-\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title},} dev=${3:'svg'}${4: ,warning=${5:FALSE}}\}
+\`\`\`\{r ${1:`!v expand("%:t:r")`_${2:Title},} dev=${3:'svg'}${4:, warning=${5:FALSE}}\}
 ${0:${VISUAL}}
 \`\`\`
 endsnippet
@@ -20,9 +20,9 @@ endsnippet
 snippet perl "include perl script sourcecode"
 #### ${1:filename}.pl ####
 \`\`\`\{r, echo=F}
-read_chunk('$1.pl', labels = '$1.pl')
+read_chunk('$1.pl', labels = '$1')
 \`\`\`
-\`\`\`\{r $1.pl, engine='${2:perl}', eval=F\}
+\`\`\`\{r $1, engine='${2:perl}', eval=F\}
 \`\`\`
 endsnippet
 
@@ -39,9 +39,10 @@ mtime <- function(files){
   sum(unlist(lapply(Sys.glob(files),function(x) file.info(x)$mtime )))
 }
 files <- c('${4}')
-opts_chunk$set(cache.extra=mtime(files), cache=TRUE, engine.opts='-l')
+opts_chunk$set(cache.extra=mtime(files), cache=TRUE, engine.opts='-l', dependson=-1)
 \`\`\`
 $0
+Author: [Jim Hester](http://jimhester.com)
 Created: TIMESTAMP
 Last Modified: TIMESTAMP
 endsnippet

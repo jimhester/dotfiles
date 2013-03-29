@@ -39,11 +39,11 @@ plugins=(vi-mode git per-directory-history history-substring-search colemak zsh-
 
 source $ZSH/oh-my-zsh.sh
 
-#bindkey '^[OA' history-substring-search-up
-#bindkey '^[OB' history-substring-search-down
-#
-#bindkey '^E' history-substring-search-up
-#bindkey '^N' history-substring-search-down
+bindkey '^[OA' history-substring-search-up
+bindkey '^[OB' history-substring-search-down
+
+bindkey '^E' history-substring-search-up
+bindkey '^N' history-substring-search-down
 
 HISTFILE=/SerreDLab/hesterj/.zsh_history
 HISTSIZE=1000000

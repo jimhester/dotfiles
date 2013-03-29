@@ -28,7 +28,7 @@ for file in \
 done
 
 #shared files
-for file in knitr/knitr_bootstrap.{css,html};do
+for file in knitr_bootstrap/knitr_bootstrap.{css,html};do
   make_link ~/share/${file##*/} ~/dotfiles/$file
 done
 
@@ -46,3 +46,6 @@ git config --global user.email "james.f.hester@gmail.com"
 if [[ ! -e ~/.spf13-vim-3/ ]]; then
   curl http://j.mp/spf13-vim3 -L -o - | sh
 fi
+
+#add Ultisnips snippets to .vim directory
+make_link ~/.vim/UltiSnips ~/dotfiles/vim/UltiSnips/

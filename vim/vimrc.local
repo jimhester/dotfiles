@@ -50,14 +50,15 @@
   nnoremap <silent> <LocalLeader>i :call RAction("dim")<CR>
   nnoremap <silent> <Space>kk :call RMakeHTML_2()<CR>
   function! RMakeHTML_2()
-      call RKnit()
-      let filename = expand("%:r:t")
-      "requires my patch to markdownToHTML
-      let rcmd = "knit2html(stylesheet='~/share/knitr_bootstrap.css', header='~/share/knitr_bootstrap.html', '" . filename . ".Rmd', output='" . filename . ".html')"
-      if g:vimrplugin_openhtml
-          let rcmd = rcmd . '; browseURL("' . filename . '.html")'
-      endif
-      call SendCmdToR(rcmd)
+    update
+    call RSetWD()
+    let filename = expand("%:r:t")
+    "requires my patch to markdownToHTML
+    let rcmd = "require('knitr');knit2html(stylesheet='~/share/knitr_bootstrap.css', header='~/share/knitr_bootstrap.html', '" . filename . ".Rmd', output='" . filename . ".html', options=c('skip_style', 'base64_images', 'use_xhtml'))"
+    if g:vimrplugin_openhtml
+        let rcmd = rcmd . '; browseURL("' . filename . '.html")'
+    endif
+    call SendCmdToR(rcmd)
   endfunction
   "}}}"
 " LustyJuggler {{{
@@ -86,13 +87,27 @@
     "snoremap <silent> <tab> <Esc>:call UltiSnips_ExpandSnippetOrJump()<cr>
     "xnoremap <tab> :call UltiSnips_SaveLastVisualSelection()<cr>gv
 "}}}
+" Modeline {{{
+" ------------------------------------------------------------------
+  function! AppendModeline()
+    let l:modeline = printf(" vim: set ts=%d sw=%d tw=%d %set :",
+          \ &tabstop, &shiftwidth, &textwidth, &expandtab ? '' : 'no')
+    let l:modeline = substitute(&commentstring, "%s", l:modeline, "")
+    call append(line("$"), l:modeline)
+  endfunction
+  nnoremap <silent> <Leader>ml :call AppendModeline()<CR>
+"}}}
 " Misc Binds {{{
 " ------------------------------------------------------------------
   "remap semicolon and colon to make getting to ex mode faster
   nnoremap ; :
   nnoremap : ;
 
+  "toggle paste with f6
   set pastetoggle=<F6>
+
+  " create markdown table with f8
+  nnoremap <F8> yyP:s/\v\S.{-}\ze(\s{2}\S\|$)/\=substitute(submatch(0),'.','-','g')/g<CR>
 
   "use 2 space tabs rather than 4
   set shiftwidth=2                " Use indents of 2 spaces
