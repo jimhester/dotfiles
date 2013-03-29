@@ -4,3 +4,6 @@
 [submodule "zsh/plugins/zsh-syntax-highlighting"]
 	path = zsh/plugins/zsh-syntax-highlighting
 	url = git://github.com/zsh-users/zsh-syntax-highlighting.git
+[submodule "knitr_bootstrap"]
+	path = knitr_bootstrap
+	url = https://github.com/jimhester/knitr_bootstrap.git
