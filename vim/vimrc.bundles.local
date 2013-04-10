@@ -18,9 +18,9 @@
   Bundle 'timestamp.vim'
   ""Bundle 'tpope/vim-commentary'
   Bundle 'tpope/vim-unimpaired'
-  "JazzCore's ultisnips fork for neocomplcache compatibility
-  Bundle 'jimhester/ultisnips'
-  ""Bundle 'SirVer/ultisnips'
+  "JazzCore's ultisnips extension for neocomplcache compatibility
+  Bundle 'JazzCore/neocomplcache-ultisnips'
+  Bundle 'SirVer/ultisnips'
   Bundle 'airblade/vim-gitgutter'
 "}}}
 let g:spf13_bundle_groups=['general', 'neocomplcache', 'programming', 'misc']
