@@ -19,10 +19,10 @@ endsnippet
 
 snippet perl "include perl script sourcecode"
 #### ${1:filename}.pl ####
-\`\`\`\{r, echo=F}
+\`\`\`\{r, echo=F, cache=FALSE}
 read_chunk('$1.pl', labels = '$1')
 \`\`\`
-\`\`\`\{r $1, engine='${2:perl}', eval=F\}
+\`\`\`\{r $1, engine='${2:perl}', eval=FALSE, cache=FALSE\}
 \`\`\`
 endsnippet
 
@@ -39,7 +39,7 @@ mtime <- function(files){
   sum(unlist(lapply(Sys.glob(files),function(x) file.info(x)$mtime )))
 }
 files <- c('${4}')
-opts_chunk$set(cache.extra=mtime(files), cache=TRUE, engine.opts='-l', dependson=-1)
+opts_chunk$set(cache.extra=mtime(files), cache=TRUE, engine.opts='-l', dependson=-1, tidy=FALSE)
 \`\`\`
 $0
 Author: [Jim Hester](http://jimhester.com)
