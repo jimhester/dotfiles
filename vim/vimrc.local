@@ -105,6 +105,11 @@
     "snoremap <silent> <tab> <Esc>:call UltiSnips_ExpandSnippetOrJump()<cr>
     "xnoremap <tab> :call UltiSnips_SaveLastVisualSelection()<cr>gv
 "}}}
+" Ultisnips {{{
+" ------------------------------------------------------------------
+  let g:yankring_replace_n_pkey = '<C-E>'
+  let g:yankring_replace_n_nkey = '<C-N>'
+"}}}
 " Misc Binds {{{
 " ------------------------------------------------------------------
   "remap semicolon and colon to make getting to ex mode faster
