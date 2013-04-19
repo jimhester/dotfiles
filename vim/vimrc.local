@@ -126,6 +126,8 @@
   "remap semicolon and colon to make getting to ex mode faster
   nnoremap ; :
   nnoremap : ;
+  vnoremap ; :
+  vnoremap : ;
 
   "toggle paste with f6
   set pastetoggle=<F6>
