@@ -73,8 +73,8 @@
   endfunction
 
   "add external scripts to RMD
-  nnoremap <silent> <leader>s :%!add_external_script.pl <enter>
-  vnoremap <silent> <leader>s :!add_external_script.pl <enter>
+  nnoremap <silent> <leader>s :%!add_external_scripts.pl <enter>
+  vnoremap <silent> <leader>s :!add_external_scripts.pl <enter>
   "}}}"
 " LustyJuggler {{{
 " ------------------------------------------------------------------
