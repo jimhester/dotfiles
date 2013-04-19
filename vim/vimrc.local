@@ -64,6 +64,10 @@
     endif
     call SendCmdToR(rcmd)
   endfunction
+
+  "add external scripts to RMD
+  nnoremap <silent> <leader>s :%!add_external_script.pl <enter>
+  vnoremap <silent> <leader>s :!add_external_script.pl <enter>
   "}}}"
 " LustyJuggler {{{
 " ------------------------------------------------------------------
