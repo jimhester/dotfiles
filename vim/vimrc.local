@@ -43,12 +43,19 @@
   let g:vimrplugin_insert_mode_cmds = 0
   let vimrplugin_notmuxconf = 1
   let vimrplugin_underscore = 0
-  let g:vimrplugin_openhtml = 1
+  let g:vimrplugin_openhtml = 0
+
+  "bind double leader to send line and selection
+  vmap , <Plug>RDSendSelection
+  nmap , <Plug>RDSendLine
+
+  "complete arguments
+  imap <C-R> <Plug>RCompleteArgs
 
   nnoremap <silent> <LocalLeader>h :call RAction("head")<CR>
   nnoremap <silent> <LocalLeader>le :call RAction("levels")<CR>
   nnoremap <silent> <LocalLeader>i :call RAction("dim")<CR>
-  nnoremap <silent> <Space>kk :call RMakeHTML_2()<CR>
+  nnoremap <silent> <LocalLeader>kk :call RMakeHTML_2()<CR>
   function! RMakeHTML_2()
     update
     call RSetWD()
