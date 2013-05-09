@@ -58,7 +58,7 @@ if(interactive()){
                     )
       location = paste(location, 'b', sep='')
     }
-    if(grepl('y', which))
+    if(grepl('y', which)){
       object = list(object, 
                     scale_y_log10(breaks=trans_breaks("log10", function(x) 10^x), 
                                   labels=trans_format("log10",math_format(10^.x)),
@@ -66,6 +66,7 @@ if(interactive()){
                                   )
                     )
       location = paste(location, 'l', sep='')
+    }
     list(annotation_logticks(..., sides=location), object)
   }
 }
