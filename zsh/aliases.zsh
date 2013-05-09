@@ -13,3 +13,4 @@ alias g="grep --color=always"
 alias gi="grep -i --color=always"
 alias cp='cp -a'
 alias -g awkt='awk -v OFS="\t"' #This needs to be global to allow insertion into pipes
+alias xm='xmessage -nearmouse DONE'
