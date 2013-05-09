@@ -39,6 +39,7 @@ mtime <- function(files){
 }
 files <- c('${4}')
 opts_chunk$set(cache.extra=mtime(files), cache=TRUE, engine.opts='-l', dependson=-1, tidy=FALSE)
+render_html()
 \`\`\`
 $0
 Author: [Jim Hester](http://jimhester.com)
