@@ -62,3 +62,9 @@ snippet child "include child document"
 \`\`\`\{r child="${1:child}${2:.Rmd}"}
 \`\`\`
 endsnippet
+
+snippet xtable "insert xtable"
+\`\`\`{r results='asis'}
+print(xtable(${0:${VISUAL}}), type='html', include.rownames=FALSE)
+\`\`\`
+endsnippet
