@@ -1,2 +1,4 @@
 R_HISTSIZE=100000
 R_LIBS_USER="/SerreDLab/hesterj/R/library"
+R_PROFILE="~/.Rprofile.site"
+LD_LIBRARY_PATH=/home/hesterj/lib

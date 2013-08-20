@@ -2,7 +2,7 @@
 #generate terminfo if they do not already exist
 mkdir -p ~/.terminfo/s/
 if [[ ! -e ~/.terminfo/s/screen-256color ]]; then
-  tic terminfou/terminfo-20120811.src
+  tic terminfo/terminfo-20120811.src
 fi
 
 function make_link(){

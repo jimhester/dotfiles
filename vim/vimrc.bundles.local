@@ -22,6 +22,7 @@
   Bundle 'JazzCore/neocomplcache-ultisnips'
   Bundle 'SirVer/ultisnips'
   Bundle 'airblade/vim-gitgutter'
+  Bundle 'jnwhiteh/vim-golang'
 "}}}
 let g:spf13_bundle_groups=['general', 'neocomplcache', 'programming', 'misc']
 let g:spf13_leader="\<Space>"

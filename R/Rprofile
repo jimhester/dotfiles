@@ -47,6 +47,7 @@ if(interactive()){
   )
 
   log_ticks <- function(which="xy", ...){
+    require(scales)
     object = list()
     location = ''
     if(grepl('x', which)){

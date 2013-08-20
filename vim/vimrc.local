@@ -60,12 +60,8 @@
     update
     call RSetWD()
     let filename = expand("%:r:t")
-    "requires my patch to markdownToHTML
-    let rcmd = "require('knitr');
-          \knit2html(
-            \header='~/share/knitr_bootstrap.html', '" .  filename . ".Rmd',
-            \options=c('skip_style', 'base64_images', 'use_xhtml')
-          \)"
+    let rcmd = "require('knitrBootstrap');
+      \knit_bootstrap(\"" . filename . ".Rmd\")"
     if g:vimrplugin_openhtml
       let rcmd = rcmd . '; browseURL("' . filename . '.html")'
     endif
@@ -140,3 +136,10 @@
   set tabstop=2                   " An indentation every 2 columns
   set softtabstop=2               " Let backspace delete indent
 "}}}
+" Go {{{
+  filetype off
+  filetype plugin indent off
+  set runtimepath+=$GOROOT/misc/vim
+  filetype plugin indent on
+  syntax on
+" }}}

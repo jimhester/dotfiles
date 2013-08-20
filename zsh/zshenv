@@ -11,3 +11,7 @@ export PERL_CPANM_OPT="--notest"
 
 #history base for per directory history
 export HISTORY_BASE=/SerreDLab/hesterj/.directory_history
+
+#Go install
+export GOROOT=$HOME/go
+export PATH=$PATH:$GOROOT/bin
