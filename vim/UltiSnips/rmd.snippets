@@ -39,7 +39,6 @@ mtime <- function(files){
 }
 files <- c('${4}')
 opts_chunk$set(cache.extra=mtime(files), cache=TRUE, engine.opts='-l', dependson=-1, tidy=FALSE)
-render_html()
 knit_hooks$set(inline=function(x) prettyNum(round(x,2), big.mark=","))
 \`\`\`
 $0
