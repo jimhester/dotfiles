@@ -6,25 +6,21 @@
 
 "
 "Bundles {{{
-  Bundle 'YankRing.vim'
   Bundle 'chriskempson/base16-vim'
   Bundle 'c9s/perlomni.vim'
-  Bundle 'ervandew/screen'
   Bundle 'godlygeek/tabular'
   Bundle 'jcfaria/Vim-R-plugin'
   Bundle 'mileszs/ack.vim'
   Bundle 'sjbach/lusty'
   Bundle 'sjl/gundo.vim'
   Bundle 'timestamp.vim'
-  ""Bundle 'tpope/vim-commentary'
   Bundle 'tpope/vim-unimpaired'
-  "JazzCore's ultisnips extension for neocomplcache compatibility
-  Bundle 'JazzCore/neocomplcache-ultisnips'
   Bundle 'SirVer/ultisnips'
-  Bundle 'airblade/vim-gitgutter'
-  Bundle 'jnwhiteh/vim-golang'
+  Bundle 'Valloric/YouCompleteMe'
+  Bundle 'maxbrunsfeld/vim-yankstack'
+  Bundle 'rhysd/clever-f.vim'
 "}}}
-let g:spf13_bundle_groups=['general', 'neocomplcache', 'programming', 'misc']
+let g:spf13_bundle_groups=['general', 'programming', 'misc']
 let g:spf13_leader="\<Space>"
 
 

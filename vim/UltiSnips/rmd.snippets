@@ -35,10 +35,10 @@ snippet start "setup caching"
 # ${1:Title} #
 \`\`\`{r ${2:`!v expand("%:t:r")`_${3:setup}}, cache=FALSE, include=FALSE}
 mtime <- function(files){
-  sum(unlist(lapply(Sys.glob(files),function(x) file.info(x)$mtime )))
+  lapply(Sys.glob(files),function(x) file.info(x)$mtime)
 }
 files <- c('${4}')
-opts_chunk$set(cache.extra=mtime(files), cache=TRUE, engine.opts='-l', dependson=-1, tidy=FALSE)
+opts_chunk$set(cache.extra=mtime(files), cache=TRUE, engine.opts='-l', tidy=FALSE)
 knit_hooks$set(inline=function(x) prettyNum(round(x,2), big.mark=","))
 \`\`\`
 $0
@@ -51,7 +51,7 @@ snippet cache "add cache.extra" w
 cache.extra=mtime(c('${0:${VISUAL:file}}'))
 endsnippet
 
-snippet c "concatonate vector" w
+snippet c "concatenate vector" w
 c('$1'$0)
 endsnippet
 
@@ -65,7 +65,7 @@ snippet child "include child document"
 endsnippet
 
 snippet xtable "insert xtable"
-\`\`\`{r results='asis'}
+\`\`\`{r echo=F, cache=F, results='asis'}
 print(xtable(${0:${VISUAL}}), type='html', include.rownames=FALSE)
 \`\`\`
 endsnippet

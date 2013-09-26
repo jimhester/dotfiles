@@ -61,11 +61,11 @@
     call RSetWD()
     let filename = expand("%:r:t")
     let rcmd = "require('knitrBootstrap');
-      \knit_bootstrap(\"" . filename . ".Rmd\")"
+      \knit_bootstrap(\"" . filename . ".Rmd\", boot_style='cerulean', code_style='tomorrow night')"
     if g:vimrplugin_openhtml
       let rcmd = rcmd . '; browseURL("' . filename . '.html")'
     endif
-    call SendCmdToR(rcmd)
+    call g:SendCmdToR(rcmd)
   endfunction
 
   "add external scripts to RMD
@@ -107,15 +107,29 @@
 "}}}
 " Ultisnips {{{
 " ------------------------------------------------------------------
+  let g:UltiSnipsExpandTrigger='<c-n>'
+  let g:UltiSnipsListSnippets='<c-l>'
+  let g:UltiSnipsJumpForwardTrigger='<c-n>'
+  let g:UltiSnipsJumpBackwardTrigger='<c-e>'
     "let g:UltiSnipsExpandTrigger="<NL>"
     "inoremap <silent> <tab> <C-R>=g:UltiSnips_Complete()<cr>
     "snoremap <silent> <tab> <Esc>:call UltiSnips_ExpandSnippetOrJump()<cr>
     "xnoremap <tab> :call UltiSnips_SaveLastVisualSelection()<cr>gv
+  "  let g:UltiSnipsExpandTrigger="<c-n>"
+  "  let g:UltiSnipsJumpForwardTrigger="<c-n>"
+  "  let g:UltiSnipsJumpBackwardTrigger="<c-e>"
 "}}}
-" Ultisnips {{{
+" Clever-F {{{
+  let g:clever_f_smart_case=1
+  let g:clever_f_fix_key_direction=1
+"}}}
+"
+" YouCompleteMe {{{
+"
+" Yankstack {{{
 " ------------------------------------------------------------------
-  let g:yankring_replace_n_pkey = '<C-E>'
-  let g:yankring_replace_n_nkey = '<C-N>'
+  nmap <leader>p <Plug>yankstack_substitute_older_paste
+  nmap <leader>P <Plug>yankstack_substitute_newer_paste
 "}}}
 " Misc Binds {{{
 " ------------------------------------------------------------------
@@ -135,6 +149,9 @@
   set shiftwidth=2                " Use indents of 2 spaces
   set tabstop=2                   " An indentation every 2 columns
   set softtabstop=2               " Let backspace delete indent
+  let g:airline_powerline_fonts = 1
+  let g:gitgutter_realtime = 1
+  set shell=/bin/bash
 "}}}
 " Go {{{
   filetype off

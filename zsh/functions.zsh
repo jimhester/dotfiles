@@ -45,3 +45,16 @@ function nwr(){
 function grep_header(){
   read line; echo "$line"; grep "$@"
 }
+
+function msg_complete(){
+  local pid=$1;
+  local sleep_time=${2:-1}
+  local command=${3:-"xmessage -nearmouse DONE"}
+
+  ps r | grep -q $pid
+  while [ $? -eq 0 ]; do
+    sleep $sleep_time
+    ps r | grep -q $pid
+  done
+  eval $command
+}
