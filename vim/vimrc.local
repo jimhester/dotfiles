@@ -46,7 +46,8 @@
   let g:vimrplugin_openhtml = 0
 
   "bind double leader to send line and selection
-  vmap , <Plug>RDSendSelection
+  "vnoremap , :call SendSelectionToR("echo", "down")<CR>
+  vmap , <Plug>REDSendSelection
   nmap , <Plug>RDSendLine
 
   "complete arguments

@@ -11,7 +11,7 @@ if(interactive()){
   library(setwidth)
   options(vimcom.verbose = 1, vimcom.allnames = TRUE)
   options(editor = 'vim -c "set ft=r"')
-  options(pager = "vim -c 'set ft=rdoc' -")
+  options(pager = "vimrpager")
   if(Sys.getenv("VIMRPLUGIN_TMPDIR") != "")
     library(vimcom)
   if(Sys.getenv("TERM") != "linux" && Sys.getenv("TERM") != "")

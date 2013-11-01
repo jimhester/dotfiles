@@ -15,8 +15,6 @@ ZSH_CUSTOM=$HOME/dotfiles/zsh
 
 export EDITOR=$HOME/bin/vim
 
-HISTORY_BASE=/SerreDLab/hesterj/.directory_history
-
 # Set to this to use case-sensitive completion
 # CASE_SENSITIVE="true"
 
@@ -35,7 +33,7 @@ DISABLE_AUTO_UPDATE="true"
 # Which plugins would you like to load? (plugins can be found in ~/.oh-my-zsh/plugins/*)
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
-plugins=(vi-mode git per-directory-history history-substring-search colemak zsh-syntax-highlighting)
+plugins=(vi-mode svn git per-directory-history history-substring-search colemak zsh-syntax-highlighting)
 
 source $ZSH/oh-my-zsh.sh
 
@@ -45,7 +43,8 @@ bindkey '^[OB' history-substring-search-down
 bindkey '^E' history-substring-search-up
 bindkey '^N' history-substring-search-down
 
-HISTFILE=/SerreDLab/hesterj/.zsh_history
+[ -x "`which lesspipe.sh`" ] && eval "$(lesspipe.sh)"
+
 HISTSIZE=1000000
 SAVEHIST=1000000
 

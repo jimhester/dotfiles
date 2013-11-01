@@ -1,5 +1,6 @@
 #htop crashes if term is not xterm
 alias htop="TERM=xterm htop"
+alias ls='gls'
 alias l='ls -lhtcr --color=auto'
 alias lc='ls -lhtcr --color=auto'
 alias lk='ls -lhSr' # sort by size
