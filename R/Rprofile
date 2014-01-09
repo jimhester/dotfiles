@@ -7,7 +7,7 @@
 #
 
 if(interactive()){
-  library(colorout)
+  #library(colorout)
   library(setwidth)
   options(vimcom.verbose = 1, vimcom.allnames = TRUE)
   options(editor = 'vim -c "set ft=r"')
@@ -15,7 +15,7 @@ if(interactive()){
   if(Sys.getenv("VIMRPLUGIN_TMPDIR") != "")
     library(vimcom)
   if(Sys.getenv("TERM") != "linux" && Sys.getenv("TERM") != "")
-    setOutputColors256(verbose = FALSE)
+    #setOutputColors256(verbose = FALSE)
   if(nchar(Sys.getenv("DISPLAY")) > 1){
     grDevices::X11.options(width = 4.5, height = 4, ypos = 0,
                            xpos = 1000, pointsize = 10)
@@ -70,4 +70,5 @@ if(interactive()){
     }
     list(annotation_logticks(..., sides=location), object)
   }
+  options(repos=c(CRAN='http://cran.rstudio.com/'))
 }
