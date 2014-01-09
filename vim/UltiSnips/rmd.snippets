@@ -25,6 +25,12 @@ read_chunk('$1.pl', labels = '$1')
 \`\`\`
 endsnippet
 
+snippet source "include source code without output" !b
+\`\`\`{r, echo=F, cache=FALSE, results='asis'}
+source_code($1)
+\`\`\`
+endsnippet
+
 snippet bash "bash shell commands"
 \`\`\`\{r ${3:`!v expand("%:t:r")`_${1:Title},} engine='${2:bash}'\}
 ${0:${VISUAL}}
@@ -36,6 +42,11 @@ snippet start "setup caching"
 \`\`\`{r ${2:`!v expand("%:t:r")`_${3:setup}}, cache=FALSE, include=FALSE}
 mtime <- function(files){
   lapply(Sys.glob(files),function(x) file.info(x)$mtime)
+}
+source_code = function(file, type=NULL){
+  if(is.null(type))
+    type = gsub(pattern='.+[.]', '', file)
+  cat(paste0('```', type, '\n'), paste0(collapse='\n', readLines(file)), '\n```\n')
 }
 files <- c('${4}')
 opts_chunk$set(cache.extra=mtime(files), cache=TRUE, engine.opts='-l', tidy=FALSE)
