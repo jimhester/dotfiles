@@ -76,7 +76,7 @@
 " LustyJuggler {{{
 " ------------------------------------------------------------------
   let g:LustyJugglerDefaultMappings = 0
-  noremap <Leader>b :LustyJuggler<CR>
+  "noremap <Leader>b :LustyJuggler<CR>
 "}}}
 " Gundo {{{
 " ------------------------------------------------------------------
@@ -108,17 +108,41 @@
 "}}}
 " Ultisnips {{{
 " ------------------------------------------------------------------
-  let g:UltiSnipsExpandTrigger='<c-n>'
-  let g:UltiSnipsListSnippets='<c-l>'
-  let g:UltiSnipsJumpForwardTrigger='<c-n>'
-  let g:UltiSnipsJumpBackwardTrigger='<c-e>'
+
+  "let g:UltiSnipsExpandTrigger='<c-n>'
+  "let g:UltiSnipsListSnippets='<c-l>'
+  "let g:UltiSnipsJumpForwardTrigger='<c-n>'
+  "let g:UltiSnipsJumpBackwardTrigger='<c-e>'
+  " from https://github.com/Valloric/YouCompleteMe/issues/420#issuecomment-28782033
+  function! g:UltiSnips_Complete()
+    call UltiSnips_ExpandSnippet()
+    if g:ulti_expand_res == 0
+      if pumvisible()
+        return "\<C-n>"
+      else
+        call UltiSnips_JumpForwards()
+        if g:ulti_jump_forwards_res == 0
+          return "\<Tab>"
+        endif
+      endif
+    endif
+    return ""
+  endfunction
+
+  let g:ycm_key_list_select_completion = ['<Down>']
+  au VimEnter * exec "inoremap <silent> " . g:UltiSnipsExpandTrigger . " <C-R>=g:UltiSnips_Complete()<cr>"
+  let g:UltiSnipsJumpForwardTrigger = '<Tab>'
+  let g:UltiSnipsJumpBackwardTrigger="<c-e>"
+
+  "let g:UltiSnipsListSnippets="<c-e>"
+
     "let g:UltiSnipsExpandTrigger="<NL>"
     "inoremap <silent> <tab> <C-R>=g:UltiSnips_Complete()<cr>
     "snoremap <silent> <tab> <Esc>:call UltiSnips_ExpandSnippetOrJump()<cr>
     "xnoremap <tab> :call UltiSnips_SaveLastVisualSelection()<cr>gv
   "  let g:UltiSnipsExpandTrigger="<c-n>"
   "  let g:UltiSnipsJumpForwardTrigger="<c-n>"
-  "  let g:UltiSnipsJumpBackwardTrigger="<c-e>"
+
 "}}}
 " Clever-F {{{
   let g:clever_f_smart_case=1
@@ -153,11 +177,10 @@
   let g:airline_powerline_fonts = 1
   let g:gitgutter_realtime = 1
   set shell=/bin/bash
+
+  "replace text in visual mode with r
+  vmap r "_dP
 "}}}
-" Go {{{
-  filetype off
-  filetype plugin indent off
-  set runtimepath+=$GOROOT/misc/vim
-  filetype plugin indent on
-  syntax on
-" }}}
+let g:EclimCompletionMethod = 'omnifunc'
+let g:spf13_no_views = 1
+UnBundle 'vim-scripts/restore_view.vim'
