@@ -1,14 +1,18 @@
-export PATH=$HOME/bin:/usr/local/bin:$HOME/.rvm/bin:$PATH
+export PATH=.:$HOME/bin:/usr/local/bin:$HOME/.rvm/bin:$PATH
 export LD_LIBRARY_PATH=$HOME/lib64:$HOME/lib
 export DATA_PATH=$HOME/data
 export PYTHONPATH=$HOME/lib/python2.7/site-packages
 export MANPATH=`manpath`:$HOME/share/man
 
 #set perl environment variables
-#eval $(perl -I /SerreDLab/hesterj/perl5/lib/perl5 -Mlocal::lib=/SerreDLab/hesterj/perl5)
+eval $(perl -I /Users/james.hester/perl5/lib/perl5 -Mlocal::lib=/Users/james.hester/perl5)
 export PERL_CPANM_OPT="--notest"
 
 eval $(gdircolors ~/.dir_colors)
 #history base for per directory history
 export HISTORY_BASE=$HOME/.directory_history
 export HISTFILE=$HOME/.zsh_history
+export CDPATH=.:~:~/projects/git_svn
+export JAVA_HOME=/System/Library/Java/JavaVirtualMachines/1.6.0.jdk/Contents/Home
+
+export EC=$HOME/Documents/workspace/ExplorysCommon/

@@ -1,62 +1,17 @@
-"
-
-
-
-
-
-"
-"Bundles {{{
-  Bundle 'chriskempson/base16-vim'
-  Bundle 'c9s/perlomni.vim'
-  Bundle 'godlygeek/tabular'
-  Bundle 'jcfaria/Vim-R-plugin'
-  Bundle 'mileszs/ack.vim'
-  "Bundle 'sjbach/lusty'
-  Bundle 'sjl/gundo.vim'
-  Bundle 'timestamp.vim'
-  Bundle 'tpope/vim-unimpaired'
-  Bundle 'SirVer/ultisnips'
-  Bundle 'Valloric/YouCompleteMe'
-  "Bundle 'maxbrunsfeld/vim-yankstack'
-  Bundle 'rhysd/clever-f.vim'
-  Bundle 'eclim'
-
-
-            Bundle 'scrooloose/nerdtree'
-            Bundle 'altercation/vim-colors-solarized'
-            Bundle 'spf13/vim-colors'
-            Bundle 'tpope/vim-surround'
-            Bundle 'spf13/vim-autoclose'
-            Bundle 'kien/ctrlp.vim'
-            Bundle 'terryma/vim-multiple-cursors'
-            Bundle 'vim-scripts/sessionman.vim'
-            Bundle 'matchit.zip'
-                Bundle 'bling/vim-airline'
-
-            Bundle 'Lokaltog/vim-easymotion'
-            Bundle 'godlygeek/csapprox'
-            Bundle 'jistr/vim-nerdtree-tabs'
-            Bundle 'flazz/vim-colorschemes'
-            Bundle 'mbbill/undotree'
-            Bundle 'myusuf3/numbers.vim'
-            Bundle 'nathanaelkane/vim-indent-guides'
-           "     Bundle 'vim-scripts/restore_view.vim'
-            Bundle 'airblade/vim-gitgutter'
-            Bundle 'tpope/vim-abolish.git'
-"}}}
-let g:spf13_bundle_groups=['programming']
-let g:spf13_leader="\<Space>"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+"Bundle 'tpope/vim-fireplace'
+"Bundle 'tpope/vim-classpath'
+"Bundle 'tpope/vim-clojure-static'
+Bundle 'chriskempson/base16-vim'
+Bundle 'c9s/perlomni.vim'
+Bundle 'godlygeek/tabular'
+Bundle 'jcfaria/Vim-R-plugin'
+Bundle 'mileszs/ack.vim'
+"Bundle 'sjbach/lusty'
+Bundle 'sjl/gundo.vim'
+Bundle 'timestamp.vim'
+Bundle 'tpope/vim-unimpaired'
+"Bundle 'maxbrunsfeld/vim-yankstack'
+Bundle 'rhysd/clever-f.vim'
+Bundle 'eclim'
+Bundle 'JuliaLang/julia-vim'
+Bundle 'tpope/vim-markdown'

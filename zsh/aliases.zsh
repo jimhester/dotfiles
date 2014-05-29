@@ -9,9 +9,20 @@ alias ll='ls -lah --color=auto'
 alias lsd='ls -d */'
 alias le='less'
 alias ht='htop'
-alias pe='perl'
 alias g="grep --color=always"
 alias gi="grep -i --color=always"
 alias cp='cp -a'
-alias -g awkt='awk -v OFS="\t"' #This needs to be global to allow insertion into pipes
+alias awkt='awk -F"\t" -v OFS="\t"' #use tab for input and output seperator
 alias xm='xmessage -nearmouse DONE'
+alias td='todo.sh add'
+
+#sort using a hash or sorted uniq
+alias U="awk '!a[\$0]++'"
+alias SU='(sort | uniq)' #the grouping parenthesis are to allow you to pipe into the combined command using stdin
+alias H='head'
+alias T='tail'
+alias LC='wc -l'
+alias B='tail -n +2'
+alias NUL='/dev/null'
+
+alias vi=vim

@@ -17,6 +17,14 @@ ${0:${VISUAL}}
 \`\`\`
 endsnippet
 
+snippet python "include python script sourcecode"
+\`\`\`\{r, echo=F, cache=FALSE}
+read_chunk('$1.py', labels = '$1')
+\`\`\`
+\`\`\`\{r $1, engine='${2:python}', eval=FALSE, cache=FALSE\}
+\`\`\`
+endsnippet
+
 snippet perl "include perl script sourcecode"
 \`\`\`\{r, echo=F, cache=FALSE}
 read_chunk('$1.pl', labels = '$1')
@@ -33,6 +41,12 @@ endsnippet
 
 snippet bash "bash shell commands"
 \`\`\`\{r ${3:`!v expand("%:t:r")`_${1:Title},} engine='${2:bash}'\}
+${0:${VISUAL}}
+\`\`\`
+endsnippet
+
+snippet julia "include julia code" !b
+\`\`\`\{r ${3:`!v expand("%:t:r")`_${1:Title},} engine='julia'\}
 ${0:${VISUAL}}
 \`\`\`
 endsnippet

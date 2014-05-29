@@ -19,6 +19,7 @@
   " map leader z to toggle folding
   nnoremap <Leader>z za
   vnoremap <Leader>z za
+
 "}}}
 " Timestamp             {{{
 " ------------------------------------------------------------------
@@ -42,7 +43,7 @@
   "do not allow insert mode commands
   let g:vimrplugin_insert_mode_cmds = 0
   let vimrplugin_notmuxconf = 1
-  let vimrplugin_underscore = 0
+  let vimrplugin_assign = 0
   let g:vimrplugin_openhtml = 0
 
   "bind double leader to send line and selection
@@ -109,18 +110,18 @@
 " Ultisnips {{{
 " ------------------------------------------------------------------
 
-  "let g:UltiSnipsExpandTrigger='<c-n>'
-  "let g:UltiSnipsListSnippets='<c-l>'
+  let g:UltiSnipsExpandTrigger='<Tab>'
+  let g:UltiSnipsListSnippets='<c-l>'
   "let g:UltiSnipsJumpForwardTrigger='<c-n>'
   "let g:UltiSnipsJumpBackwardTrigger='<c-e>'
   " from https://github.com/Valloric/YouCompleteMe/issues/420#issuecomment-28782033
   function! g:UltiSnips_Complete()
-    call UltiSnips_ExpandSnippet()
+    call UltiSnips#ExpandSnippet()
     if g:ulti_expand_res == 0
       if pumvisible()
         return "\<C-n>"
       else
-        call UltiSnips_JumpForwards()
+        call UltiSnips#JumpForwards()
         if g:ulti_jump_forwards_res == 0
           return "\<Tab>"
         endif
@@ -164,6 +165,10 @@
   vnoremap ; :
   vnoremap : ;
 
+  "unmap the 0 and $ binds
+  nnoremap 0 0
+  nnoremap $ $
+
   "toggle paste with f6
   set pastetoggle=<F6>
 
@@ -174,7 +179,6 @@
   set shiftwidth=2                " Use indents of 2 spaces
   set tabstop=2                   " An indentation every 2 columns
   set softtabstop=2               " Let backspace delete indent
-  let g:airline_powerline_fonts = 1
   let g:gitgutter_realtime = 1
   set shell=/bin/bash
 
@@ -184,3 +188,19 @@
 let g:EclimCompletionMethod = 'omnifunc'
 let g:spf13_no_views = 1
 UnBundle 'vim-scripts/restore_view.vim'
+
+"use tabs in java files because explorys is dumb
+autocmd Filetype java setlocal ts=2 sw=2 noexpandtab
+
+let g:pymode_doc_bind = '<leader>K'
+let g:pymode_options = 0
+let g:pymode_lint_ignore = "E501"
+let g:pymode_lint_cwindow = 0
+
+nnoremap <silent> <buffer> <F3> :JavaSearchContext<cr>
+
+" If moving up or down with a count add to jumplist
+" From https://superuser.com/questions/539708/vim-moving-around-using-relativenumber-and-adding-it-to-the-jump-list-for-use-w/539836#539836?newreg=bc727bd1089147209b0c06f594fe3f74
+set relativenumber
+nnoremap <silent> n :<C-U>execute 'normal!' (v:count > 1 ? "m'" . v:count : '') . 'j'<CR>
+nnoremap <silent> e :<C-U>execute 'normal!' (v:count > 1 ? "m'" . v:count : '') . 'k'<CR>

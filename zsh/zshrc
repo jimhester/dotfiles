@@ -9,7 +9,8 @@ ZSH=$HOME/.oh-my-zsh
 # Optionally, if you set this to "random", it'll load a random theme each
 # time that oh-my-zsh is loaded.
 
-ZSH_THEME="dst"
+#ZSH_THEME="dst"
+ZSH_THEME="awesomepanda"
 
 ZSH_CUSTOM=$HOME/dotfiles/zsh
 
@@ -33,7 +34,7 @@ DISABLE_AUTO_UPDATE="true"
 # Which plugins would you like to load? (plugins can be found in ~/.oh-my-zsh/plugins/*)
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
-plugins=(vi-mode svn git per-directory-history history-substring-search colemak zsh-syntax-highlighting)
+plugins=(vi-mode ant svn git per-directory-history history-substring-search colemak zsh-syntax-highlighting autosuggestions)
 
 source $ZSH/oh-my-zsh.sh
 
@@ -43,6 +44,11 @@ bindkey '^[OB' history-substring-search-down
 bindkey '^E' history-substring-search-up
 bindkey '^N' history-substring-search-down
 
+# Edit the current command line in $EDITOR
+autoload -U edit-command-line
+zle -N edit-command-line
+bindkey '\C-x\C-e' edit-command-line
+
 [ -x "`which lesspipe.sh`" ] && eval "$(lesspipe.sh)"
 
 HISTSIZE=1000000
@@ -50,3 +56,9 @@ SAVEHIST=1000000
 
 #fix grep color
 unset GREP_COLOR
+
+AUTOSUGGESTION_HIGHLIGHT_COLOR='fg=250'
+bindkey 'FINISH' end_accept
+bindkey '' vi-forward-word-end
+
+todo.sh list

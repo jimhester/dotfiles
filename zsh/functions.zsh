@@ -58,3 +58,20 @@ function msg_complete(){
   done
   eval $command
 }
+
+function line(){
+  local number=$1
+  (head -$1 | tail -n 1)
+}
+
+function pass_header(){
+  IFS= read -r header
+  echo $header
+  "$@"
+}
+
+function end_accept(){
+  vi-end-of-line
+  accept-line
+}
+zle -N end_accept
