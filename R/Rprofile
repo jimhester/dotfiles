@@ -8,7 +8,7 @@
 
 if(interactive()){
   #library(colorout)
-  library(setwidth)
+  #library(setwidth)
   options(menu.graphics=FALSE) #graphics dialogs always seem to crash R
   options(vimcom.verbose = 1, vimcom.allnames = TRUE)
   options(editor = 'vim -c "set ft=r"')
@@ -23,7 +23,18 @@ if(interactive()){
 #    options(editor = 'gvim -f -c "set ft=r"')
 #    options(pager = "gvim -c 'set ft=rdoc' -")
   }
-  require(ggplot2)
+  withOptions <- function(optlist, expr)
+  {
+    oldopt <- options(optlist)
+    on.exit(options(oldopt))
+    expr <- substitute(expr)
+    eval.parent(expr)
+  }
+
+  less = function(x) {
+    withOptions(list(pager='less', dplyr.print_min=.Machine$integer.max, width=10000, max.print=1e6), page(x, method='print'))
+  }
+  library(ggplot2)
 
   #use white backgrounds
   theme_set(theme_bw())
@@ -59,5 +70,30 @@ if(interactive()){
     #}
     #list(annotation_logticks(..., sides=location), object)
   #}
-  options(repos=c(CRAN='http://cran.rstudio.com/'))
+
+  library(devtools)
+  
+  # helper function to convert a data frame print output to an actual data frame
+  convert_data.frame <- function(x) {
+    lines <- strsplit(x, "\n")[[1]]
+
+    locs <- rex::re_matches(lines[1], rex::rex(non_spaces), global = TRUE, locations = TRUE)[[1]]
+
+    rowname_size <- rex::re_matches(lines[length(lines)], rex::rex(non_spaces), locations = TRUE)
+
+    starts <- c(rowname_size$end + 1, locs$end[-length(locs$end)] + 1)
+    ends <- locs$end
+
+    remove_whitespace <- function(x) {
+      re_substitutes(x, rex::rex(list(start, any_spaces) %or% list(any_spaces, end)), '', global = TRUE)
+    }
+
+    fields <- lapply(lapply(lines, substring, starts, ends), remove_whitespace)
+
+    df <- as.data.frame(matrix(unlist(fields[-1]), ncol = length(fields[[1]]), byrow = TRUE), stringsAsFactors = FALSE)
+    df[] <- lapply(df, type.convert, as.is=TRUE)
+    colnames(df) <- fields[[1]]
+    df
+  }
 }
+options(repos=c(CRAN='http://cran.rstudio.com/'))

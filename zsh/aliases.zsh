@@ -18,6 +18,7 @@ alias td='todo.sh add'
 
 #sort using a hash or sorted uniq
 alias U="awk '!a[\$0]++'"
+alias UC="awk '{a[\$0]++}END{ for(key in a){ print key, a[key] } }'"
 alias SU='(sort | uniq)' #the grouping parenthesis are to allow you to pipe into the combined command using stdin
 alias H='head'
 alias T='tail'
@@ -25,4 +26,5 @@ alias LC='wc -l'
 alias B='tail -n +2'
 alias NUL='/dev/null'
 
+alias vim="vim --servername VIM"
 alias vi=vim

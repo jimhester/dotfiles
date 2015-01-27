@@ -6,6 +6,32 @@ x_angle <- theme(axis.text.x = element_text(size = ${1:7},
 $0
 endsnippet
 
-snippet doclink "Rdocument link" !
+snippet link "Rdocument link" !
 \code{\link{${1:${VISUAL}}}}
+endsnippet
+
+snippet href "Rdocument href"
+\href{${1:http://blah.com}}{${2:description}}
+endsnippet
+
+snippet test_that "create test that function" b
+test_that("${1:description}", {
+  $0
+})
+endsnippet
+
+snippet ef "Expect false" b
+expect_false(${1:${VISUAL}})
+endsnippet
+
+snippet et "Expect true" b
+expect_true(${1:${VISUAL}})
+endsnippet
+
+snippet ee "Expect equal" b
+expect_equal(${1:${VISUAL}}, $2)
+endsnippet
+
+snippet code "code"
+\code{${1:${VISUAL}}}
 endsnippet

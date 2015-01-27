@@ -26,8 +26,7 @@
   let g:timestamp_username="Jim Hester"
   let g:timestamp_modelines=15
   let g:timestamp_rep='%Y %b %d %r'
-  let g:timestamp_regexp='\v\c%(<%(last )?%(changed?|modified):\s+)@<=%(\d{4}.*$?)|TIMESTAMP.*$'
-" }}}
+  let g:timestamp_regexp='\v\c%(<%(last )?%(changed?|modified):\s+)@<=%(\d{4}.*$?)|TIMESTAMP.*$' " }}}
 " Perl                  {{{
 " ------------------------------------------------------------------
   "to tidy the code"
@@ -44,7 +43,13 @@
   let g:vimrplugin_insert_mode_cmds = 0
   let vimrplugin_notmuxconf = 1
   let vimrplugin_assign = 0
+  inoremap Q <space><-<space>
+  inoremap QQ Q
+  inoremap <C-Q> <space>-><space>
+  nnoremap Q i<space><-<space><Esc>
   let g:vimrplugin_openhtml = 0
+  let vimrpuglin_show_args = 1
+  let r_indent_align_args = 0
 
   "bind double leader to send line and selection
   "vnoremap , :call SendSelectionToR("echo", "down")<CR>
@@ -52,7 +57,7 @@
   nmap , <Plug>RDSendLine
 
   "complete arguments
-  imap <C-R> <Plug>RCompleteArgs
+  imap <C-A> <Plug>RCompleteArgs
 
   nnoremap <silent> <LocalLeader>h :call RAction("head")<CR>
   nnoremap <silent> <LocalLeader>le :call RAction("levels")<CR>
@@ -62,13 +67,17 @@
     update
     call RSetWD()
     let filename = expand("%:r:t")
-    let rcmd = "require('knitrBootstrap');
-      \knit_bootstrap(\"" . filename . ".Rmd\", boot_style='cerulean', code_style='tomorrow night')"
+    let rcmd = "require('knitrBootstrap');\
+      \render(\"" . filename . ".Rmd\", knitrBootstrap::bootstrap_document")
     if g:vimrplugin_openhtml
       let rcmd = rcmd . '; browseURL("' . filename . '.html")'
     endif
     call g:SendCmdToR(rcmd)
   endfunction
+
+  let g:syntastic_enable_r_lintr_checker = 1
+  let g:syntastic_r_checkers = 1
+  let g:syntastic_r_lintr_linters = "with_defaults(line_length_linter(120))"
 
   "add external scripts to RMD
   nnoremap <silent> <leader>s :%!add_external_scripts.pl <enter>
@@ -186,8 +195,8 @@
   vmap r "_dP
 "}}}
 let g:EclimCompletionMethod = 'omnifunc'
-let g:spf13_no_views = 1
 UnBundle 'vim-scripts/restore_view.vim'
+UnBundle 'AutoClose'
 
 "use tabs in java files because explorys is dumb
 autocmd Filetype java setlocal ts=2 sw=2 noexpandtab
@@ -204,3 +213,10 @@ nnoremap <silent> <buffer> <F3> :JavaSearchContext<cr>
 set relativenumber
 nnoremap <silent> n :<C-U>execute 'normal!' (v:count > 1 ? "m'" . v:count : '') . 'j'<CR>
 nnoremap <silent> e :<C-U>execute 'normal!' (v:count > 1 ? "m'" . v:count : '') . 'k'<CR>
+
+"run command, put output into new buffer
+command! -nargs=* -complete=shellcmd Run new | setlocal buftype=nofile bufhidden=hide noswapfile | r !<args>
+
+source ~/.ssh/github_token
+
+let g:xml_syntax_folding = 1

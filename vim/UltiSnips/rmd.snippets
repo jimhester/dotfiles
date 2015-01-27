@@ -91,6 +91,31 @@ endsnippet
 
 snippet xtable "insert xtable"
 \`\`\`{r echo=F, cache=F, results='asis'}
-print(xtable(${0:${VISUAL}}), type='html', include.rownames=FALSE)
+print(xtable(${0:${VISUAL}}), type='html', include.rownames=FALSE) \`\`\`
+endsnippet
+
+snippet side
+<div class='row'> <div class='col-md-6'>
+\`\`\`{r}
+<<$1_ggplot2>>
 \`\`\`
+</div> <div class='col-md-6'>
+\`\`\`{r}
+<<$1_ggvis>>
+\`\`\`
+</div> </div>
+endsnippet
+
+snippet gg2
+[ggplot2][]
+endsnippet
+
+snippet ggv
+[ggvis][]
+endsnippet
+
+snippet yaml
+---
+output: ${1:html_document}
+---
 endsnippet

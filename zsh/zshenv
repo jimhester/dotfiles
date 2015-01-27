@@ -1,4 +1,4 @@
-export PATH=.:$HOME/bin:/usr/local/bin:$HOME/.rvm/bin:$PATH
+export PATH=.:$HOME/.cabal/bin:$HOME/bin:$HOME/hadoop/hadoop-2.0.0-cdh4.2.1/bin:/usr/local/bin:$HOME/.rvm/bin:$PATH
 export LD_LIBRARY_PATH=$HOME/lib64:$HOME/lib
 export DATA_PATH=$HOME/data
 export PYTHONPATH=$HOME/lib/python2.7/site-packages
@@ -13,6 +13,12 @@ eval $(gdircolors ~/.dir_colors)
 export HISTORY_BASE=$HOME/.directory_history
 export HISTFILE=$HOME/.zsh_history
 export CDPATH=.:~:~/projects/git_svn
-export JAVA_HOME=/System/Library/Java/JavaVirtualMachines/1.6.0.jdk/Contents/Home
+export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk1.7.0_75.jdk/Contents/Home/
+export EX=$HOME/Documents/workspace/
+export EC=$EX/ExplorysCommon/
+export ANR=$EX/AnalyticsReports/
+export DI=$EX/DataIndexing/
+export PM=$EX/PatientMatching/
+export PE=$EX/PerformanceExplorer/
 
-export EC=$HOME/Documents/workspace/ExplorysCommon/
+export MYSQL_HOME=/usr/local/Cellar/mysql51/5.1.73/lib/mysql
