@@ -1,6 +1,5 @@
 #htop crashes if term is not xterm
 alias htop="TERM=xterm htop"
-alias ls='gls'
 alias l='ls -lhtcr --color=auto'
 alias lc='ls -lhtcr --color=auto'
 alias lk='ls -lhSr' # sort by size
@@ -26,5 +25,4 @@ alias LC='wc -l'
 alias B='tail -n +2'
 alias NUL='/dev/null'
 
-alias vim="vim --servername VIM"
 alias vi=vim

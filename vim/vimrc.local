@@ -217,6 +217,23 @@ nnoremap <silent> e :<C-U>execute 'normal!' (v:count > 1 ? "m'" . v:count : '') 
 "run command, put output into new buffer
 command! -nargs=* -complete=shellcmd Run new | setlocal buftype=nofile bufhidden=hide noswapfile | r !<args>
 
-source ~/.ssh/github_token
+"source ~/.ssh/github_token
 
 let g:xml_syntax_folding = 1
+
+" vim-tmux-navigator {{{
+" ------------------------------------------------------------------
+let g:tmux_navigator_no_mappings = 1
+
+nnoremap <silent> <c-h> :TmuxNavigateLeft<cr>
+nnoremap <silent> <c-n> :TmuxNavigateDown<cr>
+nnoremap <silent> <c-e> :TmuxNavigateUp<cr>
+nnoremap <silent> <c-i> :TmuxNavigateRight<cr>
+nnoremap <silent> <c-\> :TmuxNavigatePrevious<cr>
+"  }}}
+
+" vim-multiple-cursors {{{
+" ------------------------------------------------------------------
+let g:multi_cursor_start_key = '<F7>'
+" }}}
+"

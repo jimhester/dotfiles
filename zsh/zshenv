@@ -1,24 +1,14 @@
-export PATH=.:$HOME/.cabal/bin:$HOME/bin:$HOME/hadoop/hadoop-2.0.0-cdh4.2.1/bin:/usr/local/bin:$HOME/.rvm/bin:$PATH
-export LD_LIBRARY_PATH=$HOME/lib64:$HOME/lib
-export DATA_PATH=$HOME/data
-export PYTHONPATH=$HOME/lib/python2.7/site-packages
-export MANPATH=`manpath`:$HOME/share/man
+# export PATH=.:$HOME/.cabal/bin:$HOME/bin:$HOME/hadoop/hadoop-2.0.0-cdh4.2.1/bin:/usr/local/bin:$HOME/.rvm/bin:$PATH
+# export LD_LIBRARY_PATH=$HOME/lib64:$HOME/lib
+# export DATA_PATH=$HOME/data
+# export PYTHONPATH=$HOME/lib/python2.7/site-packages
+# export MANPATH=`manpath`:$HOME/share/man
 
 #set perl environment variables
-eval $(perl -I /Users/james.hester/perl5/lib/perl5 -Mlocal::lib=/Users/james.hester/perl5)
-export PERL_CPANM_OPT="--notest"
+#eval $(perl -I /Users/james.hester/perl5/lib/perl5 -Mlocal::lib=/Users/james.hester/perl5)
+#export PERL_CPANM_OPT="--notest"
 
-eval $(gdircolors ~/.dir_colors)
+# eval $(gdircolors ~/.dir_colors)
 #history base for per directory history
 export HISTORY_BASE=$HOME/.directory_history
 export HISTFILE=$HOME/.zsh_history
-export CDPATH=.:~:~/projects/git_svn
-export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk1.7.0_75.jdk/Contents/Home/
-export EX=$HOME/Documents/workspace/
-export EC=$EX/ExplorysCommon/
-export ANR=$EX/AnalyticsReports/
-export DI=$EX/DataIndexing/
-export PM=$EX/PatientMatching/
-export PE=$EX/PerformanceExplorer/
-
-export MYSQL_HOME=/usr/local/Cellar/mysql51/5.1.73/lib/mysql
