@@ -1,0 +1,33 @@
+snippet start "Create a new python script"
+#!/usr/bin/env python
+###############################################################################
+# By Jim Hester
+# Created: 2015 Mar 31 10:17:20 AM
+# Last Modified: 2015 Mar 31 10:20:24 AM
+# Title:${1:`!v fnamemodify(bufname("%"),":t")`}
+# Purpose:${2:Description}
+###############################################################################
+
+import argparse
+
+def main():
+  parser = argparse.ArgumentParser(description='$2')
+  parser.add_argument('infile', nargs='*', type=argparse.FileType, default="-")
+  group = parser.add_mutually_exclusive_group()
+  group.add_argument('--outfile',
+    help='specify the output file. <stdout>')
+  group.add_argument('--inplace', action='store_true',
+    help='modify files in place')
+  args = parser.parse_args()
+
+  if args.output and args.output != '-':
+    sys.stdout = open(args.output, 'w')
+
+  for line in fileinput.input(args.files, inplace=args.inplace):
+    $0
+
+if __name__ == "__main__":
+  main()
+
+`!v system("chmod ug+x " . shellescape(expand('%')))``!p vim.command(":write!")`
+endsnippet
