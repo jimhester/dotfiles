@@ -8,7 +8,6 @@ ZSH=$HOME/.oh-my-zsh
 # Optionally, if you set this to "random", it'll load a random theme each
 # time that oh-my-zsh is loaded.
 
-#ZSH_THEME="dst"
 ZSH_THEME="zhann"
 
 ZSH_CUSTOM=$HOME/dotfiles/zsh
@@ -36,9 +35,19 @@ ZSH_TMUX_AUTOSTART=true
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 #per-directory-history 
-plugins=(vi-mode ant svn git history-substring-search colemak
-  zsh-syntax-highlighting autosuggestions per-directory-history autojump
-  command-not-found jsontools tmux)
+plugins=(vi-mode
+        ant
+        svn
+        git
+        zsh-syntax-highlighting
+        history-substring-search
+        colemak
+        zsh-autosuggestions
+        per-directory-history
+        autojump
+        command-not-found
+        jsontools
+        tmux)
 
 source $ZSH/oh-my-zsh.sh
 
@@ -56,6 +65,10 @@ SAVEHIST=1000000
 #fix grep color
 unset GREP_COLOR
 
-AUTOSUGGESTION_HIGHLIGHT_COLOR='fg=1'
-bindkey 'FINISH' end_accept
-bindkey '' vi-forward-word-end
+AUTOSUGGESTION_HIGHLIGHT_COLOR='fg=250'
+autosuggest-start
+
+# bindkey 'FINISH' end_accept
+# bindkey '' vi-forward-word-end
+
+eval `dircolors ~/pkg/dircolors-solarized/dircolors.ansi-light`

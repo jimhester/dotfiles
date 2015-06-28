@@ -9,7 +9,7 @@
   " Leader/nops/escape    {{{
   " ------------------------------------------------------------------
   " redefine leader from default backslash
-  let maplocalleader = "\<Space>"
+  "let maplocalleader = "\<Space>"
 "}}}
 
 " Search, Copy, Replace {{{
@@ -49,7 +49,7 @@
   nnoremap Q i<space><-<space><Esc>
   let g:vimrplugin_openhtml = 0
   let vimrpuglin_show_args = 1
-  let r_indent_align_args = 0
+  let r_indent_align_args = 1
 
   "bind double leader to send line and selection
   "vnoremap , :call SendSelectionToR("echo", "down")<CR>
@@ -77,7 +77,7 @@
 
   let g:syntastic_enable_r_lintr_checker = 1
   let g:syntastic_r_checkers = 1
-  let g:syntastic_r_lintr_linters = "with_defaults(line_length_linter(120))"
+  let g:syntastic_r_lintr_linters = "with_defaults(camel_case_linter = NULL, line_length_linter(120))"
 
   "add external scripts to RMD
   nnoremap <silent> <leader>s :%!add_external_scripts.pl <enter>
@@ -236,4 +236,11 @@ nnoremap <silent> <c-\> :TmuxNavigatePrevious<cr>
 " ------------------------------------------------------------------
 let g:multi_cursor_start_key = '<F7>'
 " }}}
+
+" Ack {{{
+" ------------------------------------------------------------------
+let g:ackprg = 'ag --nogroup --nocolor --column'
+" }}}
 "
+call dirsettings#Install()
+let g:textobj#quote#educate = 0

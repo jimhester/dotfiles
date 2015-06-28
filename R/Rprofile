@@ -9,6 +9,11 @@
 if(interactive()){
   #library(colorout)
   #library(setwidth)
+
+  options(warnPartialMatchAttr = TRUE,
+          warnPartialMatchDollar = TRUE,
+          warn = 1)
+
   options(menu.graphics=FALSE) #graphics dialogs always seem to crash R
   options(vimcom.verbose = 1, vimcom.allnames = TRUE)
   options(editor = 'vim -c "set ft=r"')
@@ -33,6 +38,16 @@ if(interactive()){
 
   less = function(x) {
     withOptions(list(pager='less', dplyr.print_min=.Machine$integer.max, width=10000, max.print=1e6), page(x, method='print'))
+  }
+
+  ch <- function(...) {
+    devtools::check(document = FALSE, ...)
+  }
+
+  tb <- traceback
+
+  echo <- function(x) {
+    cat(readLines(x), sep = "\n")
   }
   library(ggplot2)
 
@@ -72,7 +87,7 @@ if(interactive()){
   #}
 
   library(devtools)
-  
+
   # helper function to convert a data frame print output to an actual data frame
   convert_data.frame <- function(x) {
     lines <- strsplit(x, "\n")[[1]]
@@ -100,5 +115,5 @@ options(repos=c(CRAN='http://cran.rstudio.com/',
     BioCsoft = "http://bioconductor.org/packages/devel/bioc",
     BioCann = "http://bioconductor.org/packages/devel/data/annotation",
     BioCexp = "http://bioconductor.org/packages/devel/data/experiment",
-    BioCextra = "http://bioconductor.org/packages/devel/data/extra"
+    BioCextra = "http://bioconductor.org/packages/devel/extra"
     ))
