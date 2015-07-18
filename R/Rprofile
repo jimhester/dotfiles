@@ -117,3 +117,11 @@ options(repos=c(CRAN='http://cran.rstudio.com/',
     BioCexp = "http://bioconductor.org/packages/devel/data/experiment",
     BioCextra = "http://bioconductor.org/packages/devel/extra"
     ))
+
+# devtools options
+
+options(
+  devtools.name = "Jim Hester",
+  devtools.desc.author = 'person("Jim", "Hester", email = "james.f.hester@gmail.com", role = c("aut", "cre"))',
+  devtools.desc.license = "MIT + file LICENSE"
+)
