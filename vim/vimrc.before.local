@@ -1,0 +1,9 @@
+let g:spf13_leader="\<Space>"
+let g:spf13_localleader="\<Space>"
+
+nnoremap <Space> <nop>
+
+" airline {{{
+" ------------------------------------------------------------------
+let g:airline_powerline_fonts = 1
+" }}}
