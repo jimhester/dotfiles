@@ -79,9 +79,11 @@
   let g:syntastic_r_checkers = 1
   let g:syntastic_r_lintr_linters = "with_defaults(camel_case_linter = NULL, line_length_linter(120))"
 
+  nnoremap s :update<CR>
+  nnoremap <silent> <leader>s :update<CR> :call g:SendCmdToR("devtools::load_all()")<CR>
   "add external scripts to RMD
-  nnoremap <silent> <leader>s :%!add_external_scripts.pl <enter>
-  vnoremap <silent> <leader>s :!add_external_scripts.pl <enter>
+  "nnoremap <silent> <leader>s :%!add_external_scripts.pl <enter>
+  "vnoremap <silent> <leader>s :!add_external_scripts.pl <enter>
   "}}}"
 " LustyJuggler {{{
 " ------------------------------------------------------------------
