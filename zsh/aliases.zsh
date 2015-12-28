@@ -25,4 +25,4 @@ alias LC='wc -l'
 alias B='tail -n +2'
 alias NUL='/dev/null'
 
-alias vi=vim
+alias vi='vim --servername VIM'
