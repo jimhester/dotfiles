@@ -1,6 +1,10 @@
 snippet start "Start blog plost"
-Title: $1
-Date: `!v strftime("%Y-%m-%d")`
+---
+layout: post
+title: ${0:${VISUAL:Title}}
+tags: R
+comments: true
+---
 endsnippet
 
 snippet ~~ "strikethrough"
@@ -37,4 +41,10 @@ endsnippet
 
 snippet end "End record"
 #### END: TIMESTAMP
+endsnippet
+
+snippet md "Markdown block"
+\`\`\`${1:r}
+${0:${VISUAL}}
+\`\`\`
 endsnippet
