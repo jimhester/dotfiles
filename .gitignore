@@ -58,3 +58,7 @@ Thumbs.db
 *.bed
 *.maf
 *.bt2
+
+*.Rcheck
+
+.ycm_extra_conf.py*
