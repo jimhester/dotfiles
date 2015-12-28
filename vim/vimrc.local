@@ -76,7 +76,9 @@
   endfunction
 
   let g:syntastic_enable_r_lintr_checker = 1
+  let g:syntastic_enable_rmd_lintr_checker = 1
   let g:syntastic_r_checkers = 1
+  let g:syntastic_rmd_checkers = 1
   let g:syntastic_r_lintr_linters = "with_defaults(camel_case_linter = NULL, line_length_linter(120))"
 
   nnoremap s :update<CR>
