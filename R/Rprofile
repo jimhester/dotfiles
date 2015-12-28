@@ -5,18 +5,27 @@
 # NOTE: changes in this file won't be reflected until after you quit
 # and start a new session
 #
-
 if(interactive()){
   #library(colorout)
   #library(setwidth)
+
+  if (file.exists("~/.Rprofile.local")) {
+    source("~/.Rprofile.local")
+  }
 
   options(warnPartialMatchAttr = TRUE,
           warnPartialMatchDollar = TRUE,
           warn = 1)
 
+  options(max.print = 1000,
+      width = 175)
+
+  # turn on completion of installed package names
+  utils::rc.settings(ipck = TRUE)
+
   options(menu.graphics=FALSE) #graphics dialogs always seem to crash R
   options(vimcom.verbose = 1, vimcom.allnames = TRUE)
-  options(editor = 'vim -c "set ft=r"')
+  #options(editor = 'vim -c "set ft=r"')
   #options(pager = "vimrpager")
   if(Sys.getenv("VIMRPLUGIN_TMPDIR") != "")
     library(vimcom)
@@ -40,11 +49,23 @@ if(interactive()){
     withOptions(list(pager='less', dplyr.print_min=.Machine$integer.max, width=10000, max.print=1e6), page(x, method='print'))
   }
 
-  ch <- function(...) {
-    devtools::check(document = FALSE, ...)
-  }
+  shortcut <- function(f) structure(f, class = "shortcut")
+  print.shortcut <- function(f, ...) do.call(f, list(...))
 
-  tb <- traceback
+  l <- shortcut(devtools::load_all)
+
+  i <- shortcut(devtools::install)
+  gh <- shortcut(devtools::install_github)
+
+  ch <- shortcut(function(...) {
+    devtools::check(document = FALSE, ...)
+  })
+  d <- shortcut(devtools::document)
+
+  tb <- shortcut(traceback)
+
+  t <- shortcut(devtools::test)
+  re <- shortcut(reprex::reprex)
 
   echo <- function(x) {
     cat(readLines(x), sep = "\n")
@@ -86,7 +107,7 @@ if(interactive()){
     #list(annotation_logticks(..., sides=location), object)
   #}
 
-  library(devtools)
+  # library(devtools)
 
   # helper function to convert a data frame print output to an actual data frame
   convert_data.frame <- function(x) {
@@ -111,12 +132,6 @@ if(interactive()){
     df
   }
 }
-options(repos=c(CRAN='http://cran.rstudio.com/',
-    BioCsoft = "http://bioconductor.org/packages/devel/bioc",
-    BioCann = "http://bioconductor.org/packages/devel/data/annotation",
-    BioCexp = "http://bioconductor.org/packages/devel/data/experiment",
-    BioCextra = "http://bioconductor.org/packages/devel/extra"
-    ))
 
 # devtools options
 
