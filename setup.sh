@@ -18,7 +18,7 @@ function make_link(){
 
 #dotfiles
 for file in \
-    vim/{vimrc.local,vimrc.bundles.local} \
+    vim/{vimrc.local,vimrc.bundles.local,vimrc.before.local} \
     zsh/{zshenv,zshrc} \
     tmux/tmux.conf \
     inputrc/inputrc \

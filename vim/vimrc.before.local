@@ -7,3 +7,5 @@ nnoremap <Space> <nop>
 " ------------------------------------------------------------------
 let g:airline_powerline_fonts = 1
 " }}}
+
+let g:spf13_bundle_groups=['general', 'writing', 'youcompleteme', 'programming', 'python', 'html', 'misc',]
