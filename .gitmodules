@@ -7,3 +7,6 @@
 [submodule "zsh/plugins/per-directory-history"]
 	path = zsh/plugins/per-directory-history
 	url = https://github.com/jimhester/per-directory-history.git
+[submodule "zsh/plugins/zsh-autosuggestions"]
+	path = zsh/plugins/zsh-autosuggestions
+	url = git@github.com:tarruda/zsh-autosuggestions.git
