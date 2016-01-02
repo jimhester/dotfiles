@@ -16,7 +16,7 @@ Bundle 'tpope/vim-unimpaired'
 Bundle 'rhysd/clever-f.vim'
 UnBundle 'JuliaLang/julia-vim'
 "Bundle 'tpope/vim-markdown'
-Bundle '2016 Jan 02 10:13:12 AM
+Bundle 'timestamp.vim'
 Bundle 'tpope/vim-dispatch'
 UnBundle 'jaxbot/github-issues.vim'
 Bundle 'sukima/xmledit'
