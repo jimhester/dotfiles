@@ -2,6 +2,7 @@ setopt no_global_rcs
 
 export PATH=.:$HOME/bin:$HOME/.Renv/shims:$HOME/.Renv/bin:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:$PATH
 export MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
+eval "$(Renv init -)"
 # export PATH=.:$HOME/.cabal/bin:$HOME/bin:$HOME/hadoop/hadoop-2.0.0-cdh4.2.1/bin:/usr/local/bin:$HOME/.rvm/bin:$PATH
 # export LD_LIBRARY_PATH=$HOME/lib64:$HOME/lib
 # export DATA_PATH=$HOME/data
