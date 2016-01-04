@@ -248,3 +248,9 @@ let g:ackprg = 'ag --nogroup --nocolor --column'
 "
 call dirsettings#Install()
 let g:textobj#quote#educate = 0
+
+" Rainbow configuration {{{
+let g:rainbow_conf = {
+    \   'ctermfgs': ['blue', 'yellow', 'cyan', 'magenta'],
+    \}
+" }}}
