@@ -80,6 +80,7 @@
   let g:syntastic_r_checkers = 1
   let g:syntastic_rmd_checkers = 1
   let g:syntastic_r_lintr_linters = "with_defaults(camel_case_linter = NULL, line_length_linter(120))"
+  let vimrplugin_tmux_title = "automatic"
 
   nnoremap s :update<CR>
   nnoremap <silent> <leader>s :update<CR> :call g:SendCmdToR("devtools::load_all()")<CR>
@@ -254,3 +255,5 @@ let g:rainbow_conf = {
     \   'ctermfgs': ['blue', 'yellow', 'cyan', 'magenta'],
     \}
 " }}}
+"
+set lazyredraw
