@@ -138,5 +138,6 @@ if(interactive()){
 options(
   devtools.name = "Jim Hester",
   devtools.desc.author = 'person("Jim", "Hester", email = "james.f.hester@gmail.com", role = c("aut", "cre"))',
-  devtools.desc.license = "MIT + file LICENSE"
+  devtools.desc.license = "MIT + file LICENSE",
+  devtools.revdep.libpath = "~/R-revdep"
 )
