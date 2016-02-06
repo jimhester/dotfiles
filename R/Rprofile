@@ -57,8 +57,12 @@ if(interactive()){
   i <- shortcut(devtools::install)
   gh <- shortcut(devtools::install_github)
 
-  ch <- shortcut(function(...) {
-    devtools::check(document = FALSE, ...)
+  id <- shortcut(function(dependencies = TRUE, ...) {
+    devtools::install_deps(dependencies = dependencies, ...)
+  })
+
+  ch <- shortcut(function(document = FALSE, ...) {
+    devtools::check(document = document, ...)
   })
   d <- shortcut(devtools::document)
 
