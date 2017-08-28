@@ -14,6 +14,7 @@ alias cp='cp -a'
 alias awkt='awk -F"\t" -v OFS="\t"' #use tab for input and output seperator
 alias xm='xmessage -nearmouse DONE'
 alias td='todo.sh add'
+alias gl="git log --stat"
 
 #sort using a hash or sorted uniq
 alias U="awk '!a[\$0]++'"
