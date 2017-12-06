@@ -18,3 +18,12 @@ vim.mapCommand({keys:"I",type:"motion",motion:"moveToBottomLine",motionArgs:{lin
 // this is the only key that isn't in qwerty or colemak position
 vim.mapCommand({keys:"j",type:"motion",motion:"moveByWords",motionArgs:{forward:!0,wordEnd:!0,inclusive:!0}})
 vim.mapCommand({keys:"J",type:"motion",motion:"moveByWords",motionArgs:{forward:!0,wordEnd:!0,bigWord:!0,inclusive:!0}})
+
+// Fix key to key mappings that mapped to the old locations
+vim.map('<Right>', 'i')
+vim.map('<Up>', 'e')
+vim.map('<Down>', 'n')
+vim.map('<Space>', 'i')
+vim.map('<C-p>', 'e')
+vim.map('<C-n>', 'n')
+vim.map(';', ':')
