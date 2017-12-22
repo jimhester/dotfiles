@@ -73,7 +73,7 @@ autosuggest-start
 # bindkey 'FINISH' end_accept
 # bindkey '' vi-forward-word-end
 
-# eval `dircolors ~/pkg/dircolors-solarized/dircolors.ansi-light`
+ eval `dircolors ~/dotfiles/dircolors/dircolors.ansi-light`
 
 # set cdpath to commonly used directories
 # cdpath=( . ~ $HOME/p $HOME/b $HOME/Rpacks )
