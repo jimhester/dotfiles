@@ -271,6 +271,8 @@ EXEC 01;31  # Unix
 .v 32
 .vh 32
 .vhd 32
+.R 32
+.Rmd 32
 
 ### Multimedia formats
 
