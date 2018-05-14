@@ -26,7 +26,7 @@
   let g:timestamp_username="Jim Hester"
   let g:timestamp_modelines=15
   let g:timestamp_rep='%Y %b %d %r'
-  let g:timestamp_regexp='\v\c%(<%(last )?%(changed?|modified):\s+)@<=%(\d{4}.*$?)|TIMESTAMP.*$' " }}}
+  let g:timestamp_regexp='\v\C%(<%(last )?%(changed?|modified):\s+)@<=%(\d{4}.*$?)|TIMESTAMP.*$' " }}}
 " Perl                  {{{
 " ------------------------------------------------------------------
   "to tidy the code"
@@ -41,15 +41,62 @@
 " ------------------------------------------------------------------
   "do not allow insert mode commands
   let g:vimrplugin_insert_mode_cmds = 0
+
+  " do not change the working directory
+  let g:R_nvim_wd = -1
   let vimrplugin_notmuxconf = 1
   let vimrplugin_assign = 0
-  inoremap Q <space><-<space>
-  inoremap QQ Q
-  inoremap <C-Q> <space>-><space>
-  nnoremap Q i<space><-<space><Esc>
+  "let g:RStudio_cmd = 'open /Applications/RStudio.app'
+  let R_nvimpager = "no"
+  let R_setwidth = 1
+  "inoremap Q <space><-<space>
+  "inoremap QQ Q
+  "inoremap <C-Q> <space>-><space>
+  "nnoremap Q i<space><-<space><Esc>
+
+  " this sets an abbreviation for '_' to '<-'
+  let g:R_assign = 0
+
   let g:vimrplugin_openhtml = 0
   let vimrpuglin_show_args = 1
-  let r_indent_align_args = 1
+  let r_indent_align_args = 0
+  let g:rout_follow_colorscheme = 1
+  let g:R_tmux_split = 1
+  let g:terminal_scrollback_buffer_size = 32768
+
+  "let g:R_vsplit = 1
+  let g:R_rconsole_width = 80
+  let g:R_esc_term = 0
+
+  " Nvim-R keybindings
+  let R_user_maps_only = 1
+  let quit_command = 'savehistory();quit(save = "no")'
+  nnoremap <silent> <LocalLeader>l :call SendCmdToR("l")<CR>
+  nnoremap <silent> <LocalLeader>t :call SendCmdToR("devtools::test_file('" . expand("%") . "')")<CR>
+  nnoremap <silent> <LocalLeader>d :call SendCmdToR("d")<CR>
+  nnoremap <silent> <LocalLeader>a :call SendCmdToR("usethis::use_test('" . expand("%") . "')")<CR>
+  nnoremap <silent> <LocalLeader>rf :call StartR("R")<CR>
+  nnoremap <silent> <LocalLeader>rc :call StartR("Custom")<CR>
+  nnoremap <silent> <LocalLeader>rq :call RQuit("save")<CR>
+
+  if has('nvim')
+    " movement commands for neovim terminal mode
+    tnoremap <silent> <C-E> <C-\><C-N>:TmuxNavigateUp<CR>
+    tnoremap <silent> <C-H> <C-\><C-N>:TmuxNavigateLeft<CR>
+    tnoremap <silent> <C-N> <C-\><C-N>:TmuxNavigateDown<CR>
+    tnoremap <silent> <C-E> <C-\><C-N>:TmuxNavigateUp<CR>
+    " we can't use C-I as that is a horizontal tab so sends tab and breaks
+    " everything
+    tnoremap <silent> <C-'> <C-\><C-N>:TmuxNavigateRight<CR>
+    tnoremap <silent> <C-\> <C-\><C-N>:TmuxNavigatePrevious<CR>
+
+    " Map Space_ to <- in the terminal
+    "tnoremap <Space>_ <Space><-
+
+    let g:R_app = "rice"
+    let g:R_cmd = "R"
+    let g:R_hl_term = 0
+  endif
 
   "bind double leader to send line and selection
   "vnoremap , :call SendSelectionToR("echo", "down")<CR>
@@ -59,9 +106,9 @@
   "complete arguments
   imap <C-A> <Plug>RCompleteArgs
 
-  nnoremap <silent> <LocalLeader>h :call RAction("head")<CR>
-  nnoremap <silent> <LocalLeader>le :call RAction("levels")<CR>
-  nnoremap <silent> <LocalLeader>i :call RAction("dim")<CR>
+  "nnoremap <silent> <LocalLeader>h :call RAction("head")<CR>
+  "nnoremap <silent> <LocalLeader>le :call RAction("levels")<CR>
+  "nnoremap <silent> <LocalLeader>i :call RAction("dim")<CR>
   nnoremap <silent> <LocalLeader>kk :call RMakeHTML_2()<CR>
   function! RMakeHTML_2()
     update
@@ -75,14 +122,21 @@
     call g:SendCmdToR(rcmd)
   endfunction
 
-  let g:syntastic_enable_r_lintr_checker = 1
-  let g:syntastic_enable_rmd_lintr_checker = 1
-  let g:syntastic_r_checkers = 1
-  let g:syntastic_rmd_checkers = 1
-  let g:syntastic_r_lintr_linters = "with_defaults(camel_case_linter = NULL, line_length_linter(120))"
-  let vimrplugin_tmux_title = "automatic"
+  "let g:syntastic_enable_r_lintr_checker = 1
+  "let g:syntastic_enable_rmd_lintr_checker = 1
+  "let g:syntastic_r_checkers = 1
+  "let g:syntastic_rmd_checkers = 1
+  "let g:syntastic_r_lintr_linters = "with_defaults(camel_case_linter = NULL, line_length_linter(120))"
 
-  nnoremap s :update<CR>
+  " Turn off neomake for c and c++ as YCM does better here
+  let g:neomake_c_enabled_makers = []
+  let g:neomake_cpp_enabled_makers = []
+  let g:neomake_r_lintr_linters = "with_defaults(camel_case_linter = NULL, line_length_linter(120))"
+  " Run Neomake on save default
+  autocmd! BufWritePost,BufEnter * Neomake
+  let g:R_tmux_title = "automatic"
+
+  nnoremap <silent>s :update<CR>
   nnoremap <silent> <leader>s :update<CR> :call g:SendCmdToR("devtools::load_all()")<CR>
   "add external scripts to RMD
   "nnoremap <silent> <leader>s :%!add_external_scripts.pl <enter>
@@ -110,6 +164,7 @@
 " CtrlP {{{
 " ------------------------------------------------------------------
   let g:ctrlp_cmd = 'CtrlPMixed'
+  let g:ctrlp_mruf_relative=1
 "}}}
 " Modeline {{{
 " ------------------------------------------------------------------
@@ -124,30 +179,30 @@
 " Ultisnips {{{
 " ------------------------------------------------------------------
 
-  let g:UltiSnipsExpandTrigger='<Tab>'
-  let g:UltiSnipsListSnippets='<c-l>'
-  "let g:UltiSnipsJumpForwardTrigger='<c-n>'
-  "let g:UltiSnipsJumpBackwardTrigger='<c-e>'
-  " from https://github.com/Valloric/YouCompleteMe/issues/420#issuecomment-28782033
-  function! g:UltiSnips_Complete()
-    call UltiSnips#ExpandSnippet()
-    if g:ulti_expand_res == 0
-      if pumvisible()
-        return "\<C-n>"
-      else
-        call UltiSnips#JumpForwards()
-        if g:ulti_jump_forwards_res == 0
-          return "\<Tab>"
-        endif
-      endif
-    endif
-    return ""
-  endfunction
+  "let g:UltiSnipsExpandTrigger='<Tab>'
+  "let g:UltiSnipsListSnippets='<c-l>'
+  ""let g:UltiSnipsJumpForwardTrigger='<c-n>'
+  ""let g:UltiSnipsJumpBackwardTrigger='<c-e>'
+  "" from https://github.com/Valloric/YouCompleteMe/issues/420#issuecomment-28782033
+  "function! g:UltiSnips_Complete()
+    "call UltiSnips#ExpandSnippet()
+    "if g:ulti_expand_res == 0
+      "if pumvisible()
+        "return "\<C-n>"
+      "else
+        "call UltiSnips#JumpForwards()
+        "if g:ulti_jump_forwards_res == 0
+          "return "\<Tab>"
+        "endif
+      "endif
+    "endif
+    "return ""
+  "endfunction
 
-  let g:ycm_key_list_select_completion = ['<Down>']
-  au VimEnter * exec "inoremap <silent> " . g:UltiSnipsExpandTrigger . " <C-R>=g:UltiSnips_Complete()<cr>"
-  let g:UltiSnipsJumpForwardTrigger = '<Tab>'
-  let g:UltiSnipsJumpBackwardTrigger="<c-e>"
+  "let g:ycm_key_list_select_completion = ['<Down>']
+  "au VimEnter * exec "inoremap <silent> " . g:UltiSnipsExpandTrigger . " <C-R>=g:UltiSnips_Complete()<cr>"
+  "let g:UltiSnipsJumpForwardTrigger = '<Tab>'
+  "let g:UltiSnipsJumpBackwardTrigger="<c-e>"
 
   "let g:UltiSnipsListSnippets="<c-e>"
 
@@ -157,6 +212,9 @@
     "xnoremap <tab> :call UltiSnips_SaveLastVisualSelection()<cr>gv
   "  let g:UltiSnipsExpandTrigger="<c-n>"
   "  let g:UltiSnipsJumpForwardTrigger="<c-n>"
+
+  "set rtp^=$HOME
+  "let g:UltiSnipsSnippetDirectories="UltiSnips"
 
 "}}}
 " Clever-F {{{
@@ -244,7 +302,7 @@ let g:multi_cursor_start_key = '<F7>'
 
 " Ack {{{
 " ------------------------------------------------------------------
-let g:ackprg = 'ag --nogroup --nocolor --column'
+let g:ackprg = 'rg --vimgrep --no-heading --glob !docs/ --glob !RcppExports.*'
 " }}}
 "
 call dirsettings#Install()
@@ -257,3 +315,27 @@ let g:rainbow_conf = {
 " }}}
 "
 set lazyredraw
+
+" vim-airline {{{
+" ------------------------------------------------------------------
+augroup FastEscape
+  autocmd!
+  au InsertEnter * set timeoutlen=0
+  au InsertLeave * set timeoutlen=1000
+augroup END
+" }}}
+"
+
+" vim-clang-format {{{
+" ------------------------------------------------------------------
+" do not format if no .clang_format file is found
+let g:clang_format#enable_fallback_style = 0
+" }}}
+"
+let g:ycm_confirm_extra_conf = 0
+let $NVIM_TUI_ENABLE_CURSOR_SHAPE=1
+
+let g:slime_target = "tmux"
+let g:slime_default_config = {"socket_name": split($TMUX, ",")[0], "target_pane": ":.+1"}
+let g:slime_no_mappings = 1
+autocmd FileType sml nmap , <Plug>SlimeParagraphSend

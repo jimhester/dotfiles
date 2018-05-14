@@ -75,3 +75,15 @@ function end_accept(){
   accept-line
 }
 zle -N end_accept
+
+function mov2gif() {
+  ffmpeg -i "$1" -vf scale=800:-1 -r 10 -f image2pipe -vcodec ppm - |\
+    convert -delay 5 -layers Optimize -loop 0 - "${1%.*}.gif"
+}
+
+# Run this to reboot camera
+camClear() {
+    echo "Killing all programs that use the camera"
+    sudo killall AppleCameraAssistant
+    sudo killall VDCAssistant
+}

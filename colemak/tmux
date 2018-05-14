@@ -1,14 +1,8 @@
-bind-key -t vi-copy n cursor-down
-bind-key -t vi-copy e cursor-up
-bind-key -t vi-copy i cursor-right
-bind-key -t vi-copy k search-again
-bind-key -t vi-copy K search-reverse
-bind-key -t vi-copy j next-word-end
-bind-key -t vi-copy J next-space-end
-bind-key -t vi-copy c-n copy-selection
-
-bind-key -t vi-choice n down
-bind-key -t vi-choice e up
-bind-key -t vi-choice c-n choose
-
-bind-key -t vi-edit c-n enter
+bind-key -T copy-mode-vi n send -X cursor-down
+bind-key -T copy-mode-vi e send -X cursor-up
+bind-key -T copy-mode-vi i send -X cursor-right
+bind-key -T copy-mode-vi k send -X search-again
+bind-key -T copy-mode-vi K send -X search-reverse
+bind-key -T copy-mode-vi j send -X next-word-end
+bind-key -T copy-mode-vi J send -X next-space-end
+bind-key -T copy-mode-vi c-n send -X copy-selection

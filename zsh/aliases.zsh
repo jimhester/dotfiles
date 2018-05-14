@@ -26,4 +26,8 @@ alias LC='wc -l'
 alias B='tail -n +2'
 alias NUL='/dev/null'
 
-alias vi='vim'
+alias vi='nvim'
+alias showmd='grip'
+
+# Delete key on tmux OSX
+bindkey "^[[3~" delete-char

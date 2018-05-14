@@ -1,7 +1,8 @@
+let g:spf13_no_autochdir = 1
 let g:spf13_leader="\<Space>"
 let g:spf13_localleader="\<Space>"
 
-nnoremap <Space> <nop>
+" nnoremap <Space> <nop>
 
 " airline {{{
 " ------------------------------------------------------------------

@@ -1,3 +1,4 @@
+options(repos = c(CRAN='https://cloud.r-project.org'))
 # .Rprofile -- commands to execute at the beginning of each R session
 #
 # You can use this file to load packages, set options, etc.
@@ -6,8 +7,15 @@
 # and start a new session
 #
 if(interactive()){
+  options(prompt = "\033[34m> \033[39m")
+  options("Ncpus" = 8L)
+
+  #library(zeallot)
+  #c(`<-`, `%<-%`) %<-% c(`%<-%`, `<-`)
   #library(colorout)
   #library(setwidth)
+
+  #tryCatch(library(gitty), warning = function(e) e, error = function(e) e)
 
   if (file.exists("~/.Rprofile.local")) {
     source("~/.Rprofile.local")
@@ -15,10 +23,18 @@ if(interactive()){
 
   options(warnPartialMatchAttr = TRUE,
           warnPartialMatchDollar = TRUE,
-          warn = 1)
+          warn = 1,
+          warning.length = 8170) # 8170 is the maximum warning length
 
-  options(max.print = 1000,
-      width = 175)
+  options(max.print = 1000)
+      # width = 175)
+
+  # pip install rice
+  # pip install pygments-style-solarized
+  options(
+    rice.color_scheme = "solarizedlight",
+    rice.auto_indentation = FALSE,
+    rice.editing_mode = "vi")
 
   # turn on completion of installed package names
   utils::rc.settings(ipck = TRUE)
@@ -26,7 +42,13 @@ if(interactive()){
   options(menu.graphics=FALSE) #graphics dialogs always seem to crash R
   options(vimcom.verbose = 1, vimcom.allnames = TRUE)
   #options(editor = 'vim -c "set ft=r"')
-  #options(pager = "vimrpager")
+
+  # Start editor in existing neovim buffer
+  # pi3 install neovim-remote
+  # https://github.com/mhinz/neovim-remote
+  options("editor" = "nvr")
+
+  #options(pager = "less")
   if(Sys.getenv("VIMRPLUGIN_TMPDIR") != "")
     library(vimcom)
   if(Sys.getenv("TERM") != "linux" && Sys.getenv("TERM") != "")
@@ -49,42 +71,71 @@ if(interactive()){
     withOptions(list(pager='less', dplyr.print_min=.Machine$integer.max, width=10000, max.print=1e6), page(x, method='print'))
   }
 
-  shortcut <- function(f) structure(f, class = "shortcut")
-  print.shortcut <- function(f, ...) do.call(f, list(...))
+  # Assign shortcuts to a hidden environment, so they don't show up in ls()
+  # Idea from https://csgillespie.github.io/efficientR/set-up.html#creating-hidden-environments-with-.rprofile
+  .env <- new.env()
+  with(.env, {
+      shortcut <- function(f) structure(f, class = "shortcut")
+      print.shortcut <- function(f, ...) f(...)
 
-  l <- shortcut(devtools::load_all)
+      p <- shortcut(covr::package_coverage)
 
-  i <- shortcut(devtools::install)
-  gh <- shortcut(devtools::install_github)
+      rs <- shortcut(function(file = "script.R", echo = TRUE, ...) source(file, echo = echo, ...))
 
-  id <- shortcut(function(dependencies = TRUE, ...) {
-    devtools::install_deps(dependencies = dependencies, ...)
+      li <- shortcut(library)
+      l <- shortcut(devtools::load_all)
+
+      i <- shortcut(devtools::install)
+      gh <- shortcut(devtools::install_github)
+
+      id <- shortcut(function(dependencies = TRUE, ...) {
+          devtools::install_deps(dependencies = dependencies, ...)
+          })
+
+      ch <- shortcut(function(document = FALSE, ...) {
+          devtools::check(document = document, ...)
+          })
+      d <- shortcut(devtools::document)
+
+# gaborcsardi/tracer
+      #tb <- shortcut(tracer::tb)
+
+        t <- shortcut(
+          test <- function(filter = NULL, length = 5, pkg = ".", ..., reporter = "progress") {
+            if (is.null(reporter)) {
+            #reporter <- testthat::SummaryReporter$new()
+            #reporter$max_reports = length
+            #reporter <- testthat:::ProgressReporter$new()
+            }
+            devtools::test(pkg, filter, reporter = reporter, ...)
+            })
+
+# jennybc/reprex
+      re <- shortcut(reprex::reprex)
+
+        qt <- shortcut(function() {
+            savehistory()
+            base::q(save="no")
+            })
+
+      echo <- function(x) {
+        cat(readLines(x), sep = "\n")
+      }
   })
-
-  ch <- shortcut(function(document = FALSE, ...) {
-    devtools::check(document = document, ...)
-  })
-  d <- shortcut(devtools::document)
-
-  tb <- shortcut(traceback)
-
-  t <- shortcut(devtools::test)
-  re <- shortcut(reprex::reprex)
-
-  echo <- function(x) {
-    cat(readLines(x), sep = "\n")
-  }
-  library(ggplot2)
+  # We need to attach stats before .env to shadow qt
+  library(stats)
+  suppressMessages(attach(.env))
+  #library(ggplot2)
 
   #use white backgrounds
-  theme_set(theme_bw())
+  #theme_set(theme_bw())
 
   ##colorblind palette
   #cb_palette <-c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
   #use color brewer as default discrete colors
-  scale_colour_discrete <- function(...) scale_color_brewer(palette="Set1", ...)
-  scale_fill_discrete <- function(...) scale_fill_brewer(palette="Set1", ...)
+  #scale_colour_discrete <- function(...) scale_color_brewer(palette="Set1", ...)
+  #scale_fill_discrete <- function(...) scale_fill_brewer(palette="Set1", ...)
 
   #log_ticks <- function(which="xy", ...){
     #require(scales)
@@ -114,7 +165,7 @@ if(interactive()){
   # library(devtools)
 
   # helper function to convert a data frame print output to an actual data frame
-  convert_data.frame <- function(x) {
+  .env$convert_data.frame <- function(x) {
     lines <- strsplit(x, "\n")[[1]]
 
     locs <- rex::re_matches(lines[1], rex::rex(non_spaces), global = TRUE, locations = TRUE)[[1]]
@@ -135,6 +186,44 @@ if(interactive()){
     colnames(df) <- fields[[1]]
     df
   }
+
+  .env$shuf <- function(x, n = 6) {
+    if (is.null(dim(x))) {
+      x[sample.int(length(x), min(n, length(x)))]
+    } else {
+      x[sample.int(NROW(x), min(n, NROW(x))), , drop = FALSE]
+    }
+  }
+
+  .env$`%>%` <- magrittr::`%>%`
+
+
+  invisible({
+    # devtools::install_github("gaborcsard/notifier")
+    notify_long_running <- function(second_cutoff = 20) {
+      last <- proc.time()[1]
+      function(expr, value, ok, visible) {
+        duration <- proc.time()[1] - last
+        if (duration > second_cutoff) {
+          notifier::notify(msg = paste0(collapse = " ", deparse(expr)), title = sprintf("Completed in %.02f (s)", duration))
+        }
+        last <<- proc.time()[1]
+        TRUE
+      }
+    }
+
+    addTaskCallback(notify_long_running())
+  })
+
+  # jimhester/lookup
+  suppressPackageStartupMessages(library(lookup))
+
+  # jimhester/autoinst
+  options(error = autoinst::autoinst)
+
+  # RStudio colors
+  #options("crayon.enabled" = TRUE, "crayon.colors" = 256)
+
 }
 
 # devtools options
@@ -142,6 +231,6 @@ if(interactive()){
 options(
   devtools.name = "Jim Hester",
   devtools.desc.author = 'person("Jim", "Hester", email = "james.f.hester@gmail.com", role = c("aut", "cre"))',
-  devtools.desc.license = "MIT + file LICENSE",
-  devtools.revdep.libpath = "~/R-revdep"
+  devtools.desc.license = "GPL-3",
+  covr.gcov = Sys.which("gcov")
 )

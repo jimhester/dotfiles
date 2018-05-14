@@ -16,9 +16,19 @@ set visible-stats on
 "\e[4~": end-of-line # End
 
 $if mode=vi
+  set keymap vi-insert
+  "\C-e": end-of-line
+  "\C-a": beginning-of-line
+
   set keymap vi-command
-  "n" next-history
-  "e" previous-history
+  #"D":kill-line
+  #"dw": kill-word
+  #"dd": kill-whole-line
+  #"db": backward-kill-word
+  #"cc": "ddi"
+  #"cw": "dwi"
+  #"cb": "dbi"
+  #"e" previous-history
   "i" forward-char
   "h" backward-char
 

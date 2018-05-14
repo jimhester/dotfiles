@@ -7,8 +7,10 @@ endif
 "Bundle 'tpope/vim-clojure-static'
 Bundle 'chriskempson/base16-vim'
 Bundle 'c9s/perlomni.vim'
-Bundle 'jcfaria/Vim-R-plugin'
-Bundle 'jalvesaq/R-Vim-runtime'
+"Bundle 'jcfaria/Vim-R-plugin'
+"Bundle 'jalvesaq/R-Vim-runtime'
+Bundle 'jalvesaq/Nvim-R'
+Bundle 'mllg/vim-devtools-plugin'
 "Bundle 'sjbach/lusty'
 Bundle 'sjl/gundo.vim'
 Bundle 'tpope/vim-unimpaired'
@@ -16,16 +18,36 @@ Bundle 'tpope/vim-unimpaired'
 Bundle 'rhysd/clever-f.vim'
 UnBundle 'JuliaLang/julia-vim'
 "Bundle 'tpope/vim-markdown'
-Bundle 'timestamp.vim'
+"Bundle 'timestamp.vim'
 Bundle 'tpope/vim-dispatch'
 UnBundle 'jaxbot/github-issues.vim'
 Bundle 'sukima/xmledit'
 Bundle 'christoomey/vim-tmux-navigator'
 Bundle 'edkolev/tmuxline.vim'
-"Bundle 'SirVer/ultisnips'
-"Bundle 'Valloric/YouCompleteMe'
 UnBundle 'Shougo/neocomplcache'
 UnBundle 'Shougo/neosnippet'
 UnBundle 'Shougo/neosnippet-snippets'
+UnBundle 'SirVer/ultisnips'
 Bundle 'mantiz/vim-plugin-dirsettings'
 Bundle 'rdnetto/YCM-Generator'
+Bundle 'deb.vim'
+
+UnBundle 'vim-airline/vim-airline'
+UnBundle "/HTML-AutoCloseTag"
+UnBundle "amirh/HTML-AutoCloseTag"
+UnBundle "scrooloose/syntastic"
+Bundle "file:///Users/jhester/pkg/neomake"
+Bundle "SpellCheck"
+
+Bundle "critiqjo/lldb.nvim"
+
+Bundle "rhysd/vim-clang-format"
+Bundle "junegunn/goyo.vim"
+UnBundle "majutsushi/tagbar"
+
+Bundle "tpope/vim-rhubarb"
+
+Bundle "jpalardy/vim-slime"
+Bundle "jez/vim-better-sml"
+
+Bundle 'jparise/vim-graphql'
