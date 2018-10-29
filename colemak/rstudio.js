@@ -3,7 +3,7 @@ window.ace.config.loadModule("ace/keyboard/vim", function(m) {
   var vim = require("ace/keyboard/vim").CodeMirror.Vim
   vim.mapCommand({keys:"n",type:"motion",motion:"moveByLines",motionArgs:{forward:!0,linewise:!0}})
   vim.mapCommand({keys:"e",type:"motion",motion:"moveByLines",motionArgs:{forward:!1,linewise:!0}})
-  vim.mapCommand({keys:"l",type:"motion",motion:"moveByCharacters",motionArgs:{forward:!0}})
+  vim.mapCommand({keys:"i",type:"motion",motion:"moveByCharacters",motionArgs:{forward:!0}})
 
   // move these keys to their qwerty positions because they are
   // in the way of hjkl (and E for J)
