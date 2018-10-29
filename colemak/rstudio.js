@@ -1,3 +1,5 @@
+// These lines need to be pasted into an open RStudio session in the object inspector
+// Right-click anywhere in the source file -> Inspect Element -> Console -> Right-click -> Paste
 window.ace.config.loadModule("ace/keyboard/vim", function(m) {
   // rotate some keys about to get qwerty "hjkl" back for movement
   var vim = require("ace/keyboard/vim").CodeMirror.Vim
