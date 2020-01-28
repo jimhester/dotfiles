@@ -1,3 +1,4 @@
+#options(repos = 'https://cloud.r-project.org')
 options(repos = c(CRAN='https://cloud.r-project.org'))
 # .Rprofile -- commands to execute at the beginning of each R session
 #
@@ -6,16 +7,9 @@ options(repos = c(CRAN='https://cloud.r-project.org'))
 # NOTE: changes in this file won't be reflected until after you quit
 # and start a new session
 #
-if(interactive()){
-  options(prompt = "\033[34m> \033[39m")
+if(interactive() && requireNamespace("rlang", quietly = TRUE)) {
   options("Ncpus" = 8L)
 
-  #library(zeallot)
-  #c(`<-`, `%<-%`) %<-% c(`%<-%`, `<-`)
-  #library(colorout)
-  #library(setwidth)
-
-  #tryCatch(library(gitty), warning = function(e) e, error = function(e) e)
 
   if (file.exists("~/.Rprofile.local")) {
     source("~/.Rprofile.local")
@@ -26,22 +20,23 @@ if(interactive()){
           warn = 1,
           warning.length = 8170) # 8170 is the maximum warning length
 
-  options(max.print = 1000)
-      # width = 175)
+  options(max.print = 1000,
+       width = 120)
 
-  # pip install rice
+  # pip install -U radian
   # pip install pygments-style-solarized
   options(
-    rice.color_scheme = "solarizedlight",
-    rice.auto_indentation = FALSE,
-    rice.editing_mode = "vi")
+    radian.prompt = "\033[0;34m>\033[0m ",
+    radian.color_scheme = "solarizedlight",
+    radian.auto_indentation = FALSE,
+    radian.editing_mode = "vi",
+    radian.history_search_no_duplicates = TRUE)
 
   # turn on completion of installed package names
   utils::rc.settings(ipck = TRUE)
 
   options(menu.graphics=FALSE) #graphics dialogs always seem to crash R
   options(vimcom.verbose = 1, vimcom.allnames = TRUE)
-  #options(editor = 'vim -c "set ft=r"')
 
   # Start editor in existing neovim buffer
   # pi3 install neovim-remote
@@ -75,48 +70,54 @@ if(interactive()){
   # Idea from https://csgillespie.github.io/efficientR/set-up.html#creating-hidden-environments-with-.rprofile
   .env <- new.env()
   with(.env, {
-      shortcut <- function(f) structure(f, class = "shortcut")
-      print.shortcut <- function(f, ...) f(...)
-
+    shortcut <- function(f) structure(f, class = "shortcut")
+    print.shortcut <- function(f, ...) {
+      res <- withVisible(f(...))
+      if (res$visible) {
+        print(res$value)
+      }
+      res$value
+    }
+      bt <- shortcut(rlang::last_error)
       p <- shortcut(covr::package_coverage)
 
       rs <- shortcut(function(file = "script.R", echo = TRUE, ...) source(file, echo = echo, ...))
 
       li <- shortcut(library)
-      l <- shortcut(devtools::load_all)
+      l <- shortcut(pkgload::load_all)
+      cl <- shortcut(function(path = ".", ...) {
+        pkgbuild::clean_dll(path)
+        pkgload::load_all(path,...)
+      })
 
-      i <- shortcut(devtools::install)
-      gh <- shortcut(devtools::install_github)
+      i <- shortcut(function(path = ".", ..., upgrade = FALSE, quick = TRUE) devtools::install(path, ..., upgrade = upgrade, quick = quick))
 
-      id <- shortcut(function(dependencies = TRUE, ...) {
-          devtools::install_deps(dependencies = dependencies, ...)
+      gh <- shortcut(remotes::install_github)
+
+      id <- shortcut(function(..., dependencies = TRUE) {
+          remotes::install_deps(..., dependencies = dependencies)
           })
 
-      ch <- shortcut(function(document = FALSE, ...) {
-          devtools::check(document = document, ...)
-          })
+      ch <- shortcut(function(..., document = FALSE, incoming = TRUE) {
+          devtools::check(..., document = document, incoming = incoming)
+      })
+
       d <- shortcut(devtools::document)
-
-# gaborcsardi/tracer
-      #tb <- shortcut(tracer::tb)
 
         t <- shortcut(
           test <- function(filter = NULL, length = 5, pkg = ".", ..., reporter = "progress") {
-            if (is.null(reporter)) {
-            #reporter <- testthat::SummaryReporter$new()
-            #reporter$max_reports = length
-            #reporter <- testthat:::ProgressReporter$new()
-            }
             devtools::test(pkg, filter, reporter = reporter, ...)
-            })
+          })
 
-# jennybc/reprex
+      # jennybc/reprex
+      if (requireNamespace("reprex")) {
       re <- shortcut(reprex::reprex)
+      }
 
-        qt <- shortcut(function() {
-            savehistory()
-            base::q(save="no")
-            })
+      qt <- shortcut(function() {
+        savehistory()
+        base::q(save="no")
+      })
 
       echo <- function(x) {
         cat(readLines(x), sep = "\n")
@@ -125,44 +126,9 @@ if(interactive()){
   # We need to attach stats before .env to shadow qt
   library(stats)
   suppressMessages(attach(.env))
-  #library(ggplot2)
-
-  #use white backgrounds
-  #theme_set(theme_bw())
-
-  ##colorblind palette
-  #cb_palette <-c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-
-  #use color brewer as default discrete colors
-  #scale_colour_discrete <- function(...) scale_color_brewer(palette="Set1", ...)
-  #scale_fill_discrete <- function(...) scale_fill_brewer(palette="Set1", ...)
-
-  #log_ticks <- function(which="xy", ...){
-    #require(scales)
-    #object = list()
-    #location = ''
-    #if(grepl('x', which)){
-      #object = list(object, 
-                    #scale_x_log10(breaks=trans_breaks("log10", function(x) 10^x), 
-                                  #labels=trans_format("log10",math_format(10^.x)),
-                                  #minor_breaks=trans_breaks("log10", function(x) 10^x/2)
-                                  #)
-                    #)
-      #location = paste(location, 'b', sep='')
-    #}
-    #if(grepl('y', which)){
-      #object = list(object, 
-                    #scale_y_log10(breaks=trans_breaks("log10", function(x) 10^x), 
-                                  #labels=trans_format("log10",math_format(10^.x)),
-                                  #minor_breaks=trans_breaks("log10", function(x) 10^x/2)
-                                  #)
-                    #)
-      #location = paste(location, 'l', sep='')
-    #}
-    #list(annotation_logticks(..., sides=location), object)
-  #}
 
   # library(devtools)
+  #requireNamespace("devtools")
 
   # helper function to convert a data frame print output to an actual data frame
   .env$convert_data.frame <- function(x) {
@@ -199,7 +165,7 @@ if(interactive()){
 
 
   invisible({
-    # devtools::install_github("gaborcsard/notifier")
+    # devtools::install_github("gaborcsardi/notifier")
     notify_long_running <- function(second_cutoff = 20) {
       last <- proc.time()[1]
       function(expr, value, ok, visible) {
@@ -216,21 +182,65 @@ if(interactive()){
   })
 
   # jimhester/lookup
-  suppressPackageStartupMessages(library(lookup))
+  #suppressPackageStartupMessages(library(lookup))
 
   # jimhester/autoinst
-  options(error = autoinst::autoinst)
+  #options(error = autoinst::autoinst)
 
   # RStudio colors
   #options("crayon.enabled" = TRUE, "crayon.colors" = 256)
 
+  #library(conflicted)
+
+  pblapply <- function(x, FUN, ..., .format = "[:bar] :percent eta: :eta") {
+    n <- length(x)
+    bar <- progress::progress_bar$new(total = n, format = .format)
+    res <- list(n)
+    for (i in seq_len(n)) {
+      res[[i]] <- FUN(x[[i]])
+      bar$tick()
+    }
+    res
+  }
+
+  ins <- function(...) .Internal(inspect(...))
+
+  #if (requireNamespace("rdoc")) {
+    #library(utils)
+    #rdoc::use_rdoc()
+  #}
+
+  if (requireNamespace("rlang")) {
+    options(
+      rlang_backtrace_on_error = "branch",
+      error = rlang::entrace
+    )
+  }
 }
 
 # devtools options
 
 options(
-  devtools.name = "Jim Hester",
-  devtools.desc.author = 'person("Jim", "Hester", email = "james.f.hester@gmail.com", role = c("aut", "cre"))',
-  devtools.desc.license = "GPL-3",
+  usethis.full_name = "Jim Hester",
+  usethis.description = list(
+    `Authors@R` = 'c(person("Jim", "Hester", email = "james.f.hester@gmail.com", role = c("aut", "cre"),
+    comment = c(ORCID = "0000-0002-2739-7082")),
+    person("RStudio", role = c("cph", "fnd"))
+    )',
+    License = "MIT + file LICENSE",
+    Version = "0.0.0.9000"
+  ),
+  usethis.protocol = "ssh",
   covr.gcov = Sys.which("gcov")
+)
+
+# Reprex options
+
+options(
+  show.error.locations= TRUE,
+  keep.source = TRUE,
+  keep.source.pkgs = TRUE,
+  reprex.highlight.hl_style  = "solarized-light",
+  reprex.highlight.font      = "Source Code Pro",
+  reprex.highlight.font_size = 50
 )
