@@ -68,8 +68,8 @@ if(interactive() && requireNamespace("rlang", quietly = TRUE)) {
 
   # Assign shortcuts to a hidden environment, so they don't show up in ls()
   # Idea from https://csgillespie.github.io/efficientR/set-up.html#creating-hidden-environments-with-.rprofile
-  .env <- new.env()
-  with(.env, {
+  .shortcut_env <- new.env()
+  with(.shortcut_env, {
     shortcut <- function(f) structure(f, class = "shortcut")
     print.shortcut <- function(f, ...) {
       res <- withVisible(f(...))
@@ -123,15 +123,16 @@ if(interactive() && requireNamespace("rlang", quietly = TRUE)) {
         cat(readLines(x), sep = "\n")
       }
   })
-  # We need to attach stats before .env to shadow qt
+  # We need to attach stats before .shortcut_env to shadow qt
   library(stats)
-  suppressMessages(attach(.env))
+  suppressMessages(attach(.shortcut_env))
+  registerS3method("print", "shortcut", print.shortcut)
 
   # library(devtools)
   #requireNamespace("devtools")
 
   # helper function to convert a data frame print output to an actual data frame
-  .env$convert_data.frame <- function(x) {
+  .shortcut_env$convert_data.frame <- function(x) {
     lines <- strsplit(x, "\n")[[1]]
 
     locs <- rex::re_matches(lines[1], rex::rex(non_spaces), global = TRUE, locations = TRUE)[[1]]
@@ -153,7 +154,7 @@ if(interactive() && requireNamespace("rlang", quietly = TRUE)) {
     df
   }
 
-  .env$shuf <- function(x, n = 6) {
+  .shortcut_env$shuf <- function(x, n = 6) {
     if (is.null(dim(x))) {
       x[sample.int(length(x), min(n, length(x)))]
     } else {
@@ -161,7 +162,7 @@ if(interactive() && requireNamespace("rlang", quietly = TRUE)) {
     }
   }
 
-  .env$`%>%` <- magrittr::`%>%`
+  .shortcut_env$`%>%` <- magrittr::`%>%`
 
 
   invisible({
