@@ -8,7 +8,7 @@ options(repos = c(CRAN='https://cloud.r-project.org'))
 # and start a new session
 #
 if(interactive() && requireNamespace("rlang", quietly = TRUE)) {
-  options("Ncpus" = 8L)
+  options("Ncpus" = 16L)
 
 
   if (file.exists("~/.Rprofile.local")) {
