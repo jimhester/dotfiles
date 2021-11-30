@@ -29,5 +29,9 @@ alias NUL='/dev/null'
 alias vi='nvim'
 alias showmd='grip'
 
+alias t='todo.sh'
+alias ta='todo.sh add'
+alias tl='todo.sh list'
+
 # Delete key on tmux OSX
 bindkey "^[[3~" delete-char

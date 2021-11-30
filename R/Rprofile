@@ -78,6 +78,8 @@ if(interactive() && requireNamespace("rlang", quietly = TRUE)) {
       }
       res$value
     }
+
+      gr <- shortcut(usethis::git_default_branch_rediscover)
       bt <- shortcut(rlang::last_error)
       p <- shortcut(covr::package_coverage)
 
@@ -94,8 +96,8 @@ if(interactive() && requireNamespace("rlang", quietly = TRUE)) {
 
       gh <- shortcut(remotes::install_github)
 
-      id <- shortcut(function(..., dependencies = TRUE) {
-          remotes::install_deps(..., dependencies = dependencies)
+      id <- shortcut(function(...) {
+        pak::local_install_dev_deps()
           })
 
       ch <- shortcut(function(..., document = FALSE, incoming = TRUE) {
@@ -122,6 +124,12 @@ if(interactive() && requireNamespace("rlang", quietly = TRUE)) {
       echo <- function(x) {
         cat(readLines(x), sep = "\n")
       }
+
+      gp <- function(package) {
+        gh_url <- usethis:::github_url(package)
+        usethis::create_from_github(gh_url, fork = TRUE)
+        pak::local_install_deps(ask = FALSE)
+  }
   })
   # We need to attach stats before .shortcut_env to shadow qt
   library(stats)
@@ -243,5 +251,6 @@ options(
   keep.source.pkgs = TRUE,
   reprex.highlight.hl_style  = "solarized-light",
   reprex.highlight.font      = "Source Code Pro",
-  reprex.highlight.font_size = 50
+  reprex.highlight.font_size = 50,
+  usethis.destdir = "~/pkg"
 )

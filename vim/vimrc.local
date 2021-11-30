@@ -61,7 +61,7 @@
   let vimrpuglin_show_args = 1
   let r_indent_align_args = 0
   let g:rout_follow_colorscheme = 1
-  let g:R_tmux_split = 1
+  "let g:R_tmux_split = 1
   let g:terminal_scrollback_buffer_size = 32768
 
   "let g:R_vsplit = 1
@@ -72,9 +72,10 @@
   let R_user_maps_only = 1
   let quit_command = 'savehistory();quit(save = "no")'
   nnoremap <silent> <LocalLeader>l :call SendCmdToR("l")<CR>
-  nnoremap <silent> <LocalLeader>t :call SendCmdToR("devtools::test_file('" . expand("%") . "')")<CR>
+  nnoremap <silent> <LocalLeader>t :call SendCmdToR("devtools::test_active_file('" . expand("%") . "')")<CR>
   nnoremap <silent> <LocalLeader>d :call SendCmdToR("d")<CR>
   nnoremap <silent> <LocalLeader>a :call SendCmdToR("usethis::use_test('" . expand("%") . "')")<CR>
+  nnoremap <silent> <LocalLeader>c :call SendCmdToR("devtools::test_coverage_active_file('" . expand("%") . "')")<CR>
   nnoremap <silent> <LocalLeader>rf :call StartR("R")<CR>
   nnoremap <silent> <LocalLeader>rc :call StartR("Custom")<CR>
   nnoremap <silent> <LocalLeader>rq :call RQuit("save")<CR>
@@ -84,7 +85,6 @@
     tnoremap <silent> <C-E> <C-\><C-N>:TmuxNavigateUp<CR>
     tnoremap <silent> <C-H> <C-\><C-N>:TmuxNavigateLeft<CR>
     tnoremap <silent> <C-N> <C-\><C-N>:TmuxNavigateDown<CR>
-    tnoremap <silent> <C-E> <C-\><C-N>:TmuxNavigateUp<CR>
     " we can't use C-I as that is a horizontal tab so sends tab and breaks
     " everything
     tnoremap <silent> <C-'> <C-\><C-N>:TmuxNavigateRight<CR>
@@ -93,7 +93,7 @@
     " Map Space_ to <- in the terminal
     "tnoremap <Space>_ <Space><-
 
-    let g:R_app = "rice"
+    let g:R_app = "radian"
     let g:R_cmd = "R"
     let g:R_hl_term = 0
   endif
@@ -104,7 +104,7 @@
   nmap , <Plug>RDSendLine
 
   "complete arguments
-  imap <C-A> <Plug>RCompleteArgs
+  "imap <C-A> <Plug>RCompleteArgs
 
   "nnoremap <silent> <LocalLeader>h :call RAction("head")<CR>
   "nnoremap <silent> <LocalLeader>le :call RAction("levels")<CR>
@@ -149,6 +149,10 @@
 "}}}
 " Gundo {{{
 " ------------------------------------------------------------------
+" https://vi.stackexchange.com/a/13863
+if has('python3')
+    let g:gundo_prefer_python3 = 1
+endif
   nnoremap <F5> :GundoToggle<CR>
 "}}}
 " Autoclose {{{
@@ -339,3 +343,59 @@ let g:slime_target = "tmux"
 let g:slime_default_config = {"socket_name": split($TMUX, ",")[0], "target_pane": ":.+1"}
 let g:slime_no_mappings = 1
 autocmd FileType sml nmap , <Plug>SlimeParagraphSend
+
+" bind space h space i to move arguments, unmap space ig, because I don't use
+" it
+let g:indent_guides_default_mapping=0
+" nnoremap <LocalLeader>h :SidewaysLeft<cr>
+" nnoremap <LocalLeader>i :SidewaysRight<cr>
+
+" bind daa, cia to delete an argument, change an argument etc.
+omap aa <Plug>SidewaysArgumentTextobjA
+xmap aa <Plug>SidewaysArgumentTextobjA
+omap ia <Plug>SidewaysArgumentTextobjI
+xmap ia <Plug>SidewaysArgumentTextobjI
+
+let g:spf13_keep_trailing_whitespace = 1
+
+"'' This is the path to the local Compiler Explorer installation required by
+"'" [compiler-explorer.vim](https://github.com/ldrumm/compiler-explorer.vim
+"'let g:ce_makefile = '/Users/jhester/pkg/compiler-explorer/Makefile'
+"'" Toggle display of the compiler-explorer assembly pane with f3
+"'map <f3> :CEToggleAsmView<CR>
+
+nnoremap <F3> :Make -j 1<CR>
+nnoremap <F4> :Make test -j 1<CR>
+
+function LC_maps()
+  " Set mappings for Language client commands
+  nnoremap <LocalLeader>h :call LanguageClient#textDocument_hover()<CR>
+  nnoremap <F1> :call LanguageClient#textDocument_definition()<CR>
+  nnoremap <F2> :call LanguageClient#textDocument_rename()<CR>
+  " Use the LSP completion for C and C++ projects
+  set omnifunc=omni#cpp#complete#Main
+endfunction
+
+autocmd Filetype cpp call LC_maps()
+autocmd Filetype c call LC_maps()
+
+let g:nvim_tree_disable_netrw = 0
+let g:nvim_tree_hijack_netrw = 0
+
+let g:LanguageClient_serverCommands = {
+    \ 'cpp': ['/usr/local/Cellar/llvm/12.0.0_1/bin/clangd', '--header-insertion=never', '--clang-tidy']
+    \}
+
+let g:LanguageClient_diagnosticsList = "Location"
+
+lua <<EOF
+require'nvim-treesitter.configs'.setup {
+  ensure_installed = "r", -- one of "all", "maintained" (parsers with maintainers), or a list of languages
+  highlight = {
+    enable = true,              -- false will disable the whole extension
+  },
+  indent = {
+    enable = true,              -- false will disable the whole extension
+  },
+}
+EOF

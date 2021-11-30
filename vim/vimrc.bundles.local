@@ -9,7 +9,7 @@ Bundle 'chriskempson/base16-vim'
 Bundle 'c9s/perlomni.vim'
 "Bundle 'jcfaria/Vim-R-plugin'
 "Bundle 'jalvesaq/R-Vim-runtime'
-Bundle 'jalvesaq/Nvim-R'
+Bundle 'jimhester/Nvim-R'
 Bundle 'mllg/vim-devtools-plugin'
 "Bundle 'sjbach/lusty'
 Bundle 'sjl/gundo.vim'
@@ -24,7 +24,7 @@ UnBundle 'jaxbot/github-issues.vim'
 Bundle 'sukima/xmledit'
 Bundle 'christoomey/vim-tmux-navigator'
 Bundle 'edkolev/tmuxline.vim'
-UnBundle 'Shougo/neocomplcache'
+"UnBundle 'Shougo/neocomplcache'
 UnBundle 'Shougo/neosnippet'
 UnBundle 'Shougo/neosnippet-snippets'
 UnBundle 'SirVer/ultisnips'
@@ -51,3 +51,15 @@ Bundle "jpalardy/vim-slime"
 Bundle "jez/vim-better-sml"
 
 Bundle 'jparise/vim-graphql'
+
+Bundle 'AndrewRadev/sideways.vim'
+
+UnBundle 'terryma/vim-multiple-cursors'
+
+"Bundle 'ldrumm/compiler-explorer.vim'
+Bundle 'leafgarland/typescript-vim'
+Bundle 'autozimu/LanguageClient-neovim'
+Bundle 'junegunn/fzf'
+Bundle 'freitass/todo.txt-vim'
+Bundle 'nvim-treesitter/nvim-treesitter'
+Bundle 'github/copilot.vim'

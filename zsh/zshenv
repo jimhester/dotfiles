@@ -1,8 +1,9 @@
 setopt no_global_rcs
 
-export PATH=.:/usr/local/opt/ccache/libexec:$HOME/bin:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:$HOME/.Renv/bin
+#export PATH=.:$HOME/bin:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:./node_modules/.bin
+export PATH=.:$HOME/bin:/usr/local/opt/ccache/libexec:/bin:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:./node_modules/.bin
 #export MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
-eval "$(~/.Renv/bin/Renv init -)"
+#eval "$(~/.Renv/bin/Renv init -)"
 # export PATH=.:$HOME/.cabal/bin:$HOME/bin:$HOME/hadoop/hadoop-2.0.0-cdh4.2.1/bin:/usr/local/bin:$HOME/.rvm/bin:$PATH
 # export LD_LIBRARY_PATH=$HOME/lib64:$HOME/lib
 # export DATA_PATH=$HOME/data
@@ -18,7 +19,7 @@ eval "$(~/.Renv/bin/Renv init -)"
 export HISTORY_BASE=$HOME/.directory_history
 export HISTFILE=$HOME/.zsh_history
 export R_KEEP_PKG_SOURCE=yes
-export MAKEFLAGS=-j8
+#export MAKEFLAGS=-j16
 
 # Workaround for nvim terminal issues with <C-H>
 # https://github.com/neovim/neovim/issues/2048#issuecomment-78045837
