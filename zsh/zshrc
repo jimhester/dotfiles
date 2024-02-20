@@ -45,7 +45,6 @@ plugins=(vi-mode
         colemak
         zsh-autosuggestions
         per-directory-history
-        autojump
         command-not-found
         jsontools
         tmux)

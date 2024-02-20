@@ -36,7 +36,8 @@ UnBundle 'vim-airline/vim-airline'
 UnBundle "/HTML-AutoCloseTag"
 UnBundle "amirh/HTML-AutoCloseTag"
 UnBundle "scrooloose/syntastic"
-Bundle "file:///Users/jhester/pkg/neomake"
+"Bundle "file:///Users/jhester/pkg/neomake"
+Bundle "neomake/neomake"
 Bundle "SpellCheck"
 
 Bundle "critiqjo/lldb.nvim"
@@ -58,8 +59,9 @@ UnBundle 'terryma/vim-multiple-cursors'
 
 "Bundle 'ldrumm/compiler-explorer.vim'
 Bundle 'leafgarland/typescript-vim'
-Bundle 'autozimu/LanguageClient-neovim'
+"Bundle 'autozimu/LanguageClient-neovim'
 Bundle 'junegunn/fzf'
 Bundle 'freitass/todo.txt-vim'
 Bundle 'nvim-treesitter/nvim-treesitter'
-Bundle 'github/copilot.vim'
+"Bundle 'github/copilot.vim'
+Bundle 'mileszs/ack.vim'

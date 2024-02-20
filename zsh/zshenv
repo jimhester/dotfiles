@@ -1,7 +1,7 @@
 setopt no_global_rcs
 
 #export PATH=.:$HOME/bin:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:./node_modules/.bin
-export PATH=.:$HOME/bin:/usr/local/opt/ccache/libexec:/bin:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:./node_modules/.bin
+export PATH=.:$HOME/bin:/usr/local/opt/ccache/libexec:/bin:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:./node_modules/.bin:/Users/jimhester/Library/Python/3.7/bin/
 #export MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
 #eval "$(~/.Renv/bin/Renv init -)"
 # export PATH=.:$HOME/.cabal/bin:$HOME/bin:$HOME/hadoop/hadoop-2.0.0-cdh4.2.1/bin:/usr/local/bin:$HOME/.rvm/bin:$PATH

@@ -1,5 +1,7 @@
 #options(repos = 'https://cloud.r-project.org')
-options(repos = c(CRAN='https://cloud.r-project.org'))
+options(repos = c(NFLX = "http://repo.test.netflix.net/netflix-cran")
+#    , CRAN="https://cloud.r-project.org")
+)
 # .Rprofile -- commands to execute at the beginning of each R session
 #
 # You can use this file to load packages, set options, etc.
@@ -27,9 +29,10 @@ if(interactive() && requireNamespace("rlang", quietly = TRUE)) {
   # pip install pygments-style-solarized
   options(
     radian.prompt = "\033[0;34m>\033[0m ",
-    radian.color_scheme = "solarizedlight",
+    radian.color_scheme = "solarized-light",
     radian.auto_indentation = FALSE,
     radian.editing_mode = "vi",
+    radian.show_vi_mode_prompt = FALSE,
     radian.history_search_no_duplicates = TRUE)
 
   # turn on completion of installed package names
@@ -254,3 +257,9 @@ options(
   reprex.highlight.font_size = 50,
   usethis.destdir = "~/pkg"
 )
+#### nflxmetatron start ####
+if (interactive() && requireNamespace("nflxmetatron", quietly = TRUE)) {
+  options(rsconnect.http = nflxmetatron:::httpMetatronCurl)
+  options(packrat.dependency.discovery.renv = FALSE)
+}
+#### nflxmetatron end ####
