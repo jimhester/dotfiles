@@ -1,20 +1,14 @@
 setopt no_global_rcs
 
-#export PATH=.:$HOME/bin:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:./node_modules/.bin
-export PATH=.:$HOME/bin:/usr/local/opt/ccache/libexec:/bin:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:./node_modules/.bin:/Users/jimhester/Library/Python/3.7/bin/
-#export MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
-#eval "$(~/.Renv/bin/Renv init -)"
-# export PATH=.:$HOME/.cabal/bin:$HOME/bin:$HOME/hadoop/hadoop-2.0.0-cdh4.2.1/bin:/usr/local/bin:$HOME/.rvm/bin:$PATH
-# export LD_LIBRARY_PATH=$HOME/lib64:$HOME/lib
-# export DATA_PATH=$HOME/data
-# export PYTHONPATH=$HOME/lib/python2.7/site-packages
-# export MANPATH=`manpath`:$HOME/share/man
-
-#set perl environment variables
-#eval $(perl -I /Users/james.hester/perl5/lib/perl5 -Mlocal::lib=/Users/james.hester/perl5)
-#export PERL_CPANM_OPT="--notest"
-
-# eval $(gdircolors ~/.dir_colors)
+# Cross-platform PATH setup
+if [[ "$OSTYPE" == darwin* ]]; then
+    # macOS with Homebrew
+    export PATH=.:$HOME/bin:/usr/local/opt/ccache/libexec:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:./node_modules/.bin:$HOME/Library/Python/3.7/bin
+    #export MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
+else
+    # Linux/WSL
+    export PATH=.:$HOME/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:./node_modules/.bin
+fi
 #history base for per directory history
 export HISTORY_BASE=$HOME/.directory_history
 export HISTFILE=$HOME/.zsh_history

@@ -74,7 +74,12 @@ else
 	# bindkey 'FINISH' end_accept
 	# bindkey '' vi-forward-word-end
 
-	 eval `gdircolors ~/dotfiles/dircolors/dircolors.ansi-light`
+	 # Use gdircolors on macOS (via Homebrew coreutils), dircolors on Linux
+ if [[ "$OSTYPE" == darwin* ]]; then
+   eval `gdircolors ~/dotfiles/dircolors/dircolors.ansi-light`
+ else
+   eval `dircolors ~/dotfiles/dircolors/dircolors.ansi-light`
+ fi
 
 	# set cdpath to commonly used directories
 	# cdpath=( . ~ $HOME/p $HOME/b $HOME/Rpacks )
