@@ -8,7 +8,7 @@ ZSH=$HOME/.oh-my-zsh
 # Optionally, if you set this to "random", it'll load a random theme each
 # time that oh-my-zsh is loaded.
 
-ZSH_THEME="zhann"
+ZSH_THEME="gentoo"
 
 ZSH_CUSTOM=$HOME/dotfiles/zsh
 
@@ -49,30 +49,41 @@ plugins=(vi-mode
         jsontools
         tmux)
 
-source $ZSH/oh-my-zsh.sh
+# Only source oh-my-zsh if we are _not_ running in cursors / vscode's agent mode
+if [[ -n "$VSCODE_SHELL_INTEGRATION" ]]; then
+    export NONITERACTIVE=1
+    export DEBIAN_FRONTEND=noninteractive
+    export GIT_PAGER=cat
+else
+	source $ZSH/oh-my-zsh.sh
 
-bindkey '^[[A' history-substring-search-up
-bindkey '^[[B' history-substring-search-down
+	bindkey '^[[A' history-substring-search-up
+	bindkey '^[[B' history-substring-search-down
 
-# Edit the current command line in $EDITOR
-autoload -U edit-command-line
-zle -N edit-command-line
-bindkey '\C-x\C-e' edit-command-line
+	# Edit the current command line in $EDITOR
+	autoload -U edit-command-line
+	zle -N edit-command-line
+	bindkey '\C-x\C-e' edit-command-line
 
-HISTSIZE=1000000
-SAVEHIST=1000000
+	HISTSIZE=1000000
+	SAVEHIST=1000000
 
-#fix grep color
-unset GREP_COLOR
+	#fix grep color
+	unset GREP_COLOR
 
-# bindkey 'FINISH' end_accept
-# bindkey '' vi-forward-word-end
+	# bindkey 'FINISH' end_accept
+	# bindkey '' vi-forward-word-end
 
- eval `dircolors ~/dotfiles/dircolors/dircolors.ansi-light`
+	 eval `gdircolors ~/dotfiles/dircolors/dircolors.ansi-light`
 
-# set cdpath to commonly used directories
-# cdpath=( . ~ $HOME/p $HOME/b $HOME/Rpacks )
+	# set cdpath to commonly used directories
+	# cdpath=( . ~ $HOME/p $HOME/b $HOME/Rpacks )
 
-#test -e ${HOME}/.iterm2_shell_integration.zsh && source ${HOME}/.iterm2_shell_integration.zsh
+	#test -e ${HOME}/.iterm2_shell_integration.zsh && source ${HOME}/.iterm2_shell_integration.zsh
 
-ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=250'
+	ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=250'
+fi
+
+#THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
+export SDKMAN_DIR="$HOME/.sdkman"
+[[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"
