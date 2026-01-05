@@ -16,6 +16,26 @@ fi
 
 echo "Setting up dotfiles for $OS..."
 
+# Install packages
+echo "Installing packages..."
+if [[ "$OS" == "linux" ]]; then
+    sudo apt update && sudo apt install -y zsh neovim ripgrep fd-find
+else
+    brew install zsh neovim ripgrep fd
+fi
+
+# Install oh-my-zsh if not present
+if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+    echo "Installing oh-my-zsh..."
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended --keep-zshrc
+else
+    echo "oh-my-zsh already installed"
+fi
+
+# Initialize git submodules (zsh plugins, etc.)
+echo "Initializing git submodules..."
+git -C "$DOTFILES_DIR" submodule update --init --recursive
+
 # Generate terminfo if they do not already exist
 mkdir -p ~/.terminfo/s/
 if [[ ! -e ~/.terminfo/s/screen-256color ]]; then
@@ -62,26 +82,16 @@ make_link ~/.config/nvim "$DOTFILES_DIR/nvim"
 
 echo ""
 echo "Dotfiles symlinks created!"
-echo ""
-echo "=== Manual steps required ==="
-echo ""
-echo "1. Install packages (run with sudo on Linux):"
-if [[ "$OS" == "linux" ]]; then
-    echo "   sudo apt update && sudo apt install -y neovim ripgrep fd-find"
-else
-    echo "   brew install neovim ripgrep fd"
+
+# Set zsh as default shell if not already
+if [[ "$SHELL" != *"zsh"* ]]; then
+    echo "Setting zsh as default shell..."
+    chsh -s "$(which zsh)"
 fi
+
 echo ""
-echo "2. Install oh-my-zsh:"
-echo '   sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended'
+echo "=== Setup complete! ==="
 echo ""
-echo "3. Install zsh plugins:"
-echo '   git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting'
-echo '   git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions'
-echo '   git clone https://github.com/zsh-users/zsh-history-substring-search ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/history-substring-search'
-echo ""
-echo "4. Set zsh as default shell:"
-echo "   chsh -s \$(which zsh)"
-echo ""
-echo "5. Start nvim to install plugins (lazy.nvim will auto-bootstrap)"
+echo "Start a new terminal or run 'zsh' to use your new shell."
+echo "Neovim plugins will auto-install on first launch."
 echo ""
