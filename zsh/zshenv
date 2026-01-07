@@ -3,8 +3,7 @@ setopt no_global_rcs
 # Cross-platform PATH setup
 if [[ "$OSTYPE" == darwin* ]]; then
     # macOS with Homebrew
-    export PATH=.:$HOME/bin:/usr/local/opt/ccache/libexec:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:./node_modules/.bin:$HOME/Library/Python/3.7/bin
-    #export MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
+    export PATH=.:$HOME/bin:/opt/nflx/bin:$HOME/.local/bin:/usr/local/opt/ccache/libexec:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:./node_modules/.bin:$HOME/Library/Python/3.7/bin
 else
     # Linux/WSL
     export PATH=.:$HOME/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:./node_modules/.bin
@@ -21,3 +20,6 @@ export R_KEEP_PKG_SOURCE=yes
 # tic $TERM.ti
 export TERMINFO="$HOME/.terminfo"
 #export NOT_CRAN="true"
+
+# Source local secrets if they exist (API keys, etc.)
+[[ -f ~/.zshenv.local ]] && source ~/.zshenv.local
