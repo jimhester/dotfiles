@@ -32,6 +32,7 @@ alias showmd='grip'
 alias t='todo.sh'
 alias ta='todo.sh add'
 alias tl='todo.sh list'
+alias clc='claude --dangerously-skip-permissions'
 
 # Delete key on tmux OSX
 bindkey "^[[3~" delete-char

@@ -71,6 +71,12 @@ make_link ~/.dir_colors "$DOTFILES_DIR/dircolors/dircolors.ansi-light"
 # Make colemak directory link
 make_link ~/.colemak "$DOTFILES_DIR/colemak/"
 
+# Work script for Claude Code
+make_link ~/.local/bin/work "$DOTFILES_DIR/genai/work"
+
+# Claude code skills
+make_link ~/.claude/skills/work "$DOTFILES_DIR/genai/skills/work"
+
 # Git config
 git config --global core.excludesfile "$DOTFILES_DIR/.gitignore"
 git config --global user.name "Jim Hester"
