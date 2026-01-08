@@ -43,6 +43,11 @@ Worker Management:
   $(basename "$0") --messages [issue] --peek   # View without marking as read
   $(basename "$0") --stage <stage> [issue]     # Set worker stage (for progress tracking)
 
+  Issue arguments support:
+    - Issue number: 42 (defaults to current repo)
+    - PR number: 47 (searches both issue_number and pr_number)
+    - Explicit repo: myrepo:42 (for cross-repo lookups)
+
 Options:
   --here       Run in current terminal instead of spawning new tab
   --status     Show status of all active workers across repos
@@ -235,10 +240,38 @@ db_mark_failed() {
     db_log_event "$worker_id" "failed" "$reason"
 }
 
-# Get worker ID by issue number (searches across all repos)
+# Parse issue argument which may be "issue" or "repo:issue"
+# Sets PARSED_REPO and PARSED_ISSUE variables
+parse_issue_arg() {
+    local input="$1"
+    PARSED_REPO=""
+    PARSED_ISSUE=""
+
+    if [[ "$input" == *:* ]]; then
+        # repo:issue format
+        PARSED_REPO="${input%%:*}"
+        PARSED_ISSUE="${input#*:}"
+    else
+        # Just issue number - default to current repo
+        PARSED_ISSUE="$input"
+        if git rev-parse --show-toplevel &>/dev/null; then
+            PARSED_REPO=$(basename "$(git rev-parse --show-toplevel)")
+        fi
+    fi
+}
+
+# Get worker ID by issue or PR number, optionally filtered by repo
+# Searches both issue_number and pr_number columns
 db_get_worker_by_issue() {
-    local issue_number="$1"
-    sqlite3 "$DB_PATH" "SELECT id FROM workers WHERE issue_number=$issue_number AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;"
+    local number="$1"
+    local repo_name="${2:-}"
+
+    local repo_filter=""
+    if [[ -n "$repo_name" ]]; then
+        repo_filter="AND repo_name='$repo_name'"
+    fi
+
+    sqlite3 "$DB_PATH" "SELECT id FROM workers WHERE (issue_number=$number OR pr_number=$number) $repo_filter AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;"
 }
 
 # Get worker ID by branch name
@@ -350,11 +383,16 @@ cmd_events() {
 
     local query
     if [[ -n "$issue_filter" ]]; then
+        parse_issue_arg "$issue_filter"
+        local where_clause="WHERE w.issue_number = $PARSED_ISSUE"
+        if [[ -n "$PARSED_REPO" ]]; then
+            where_clause="$where_clause AND w.repo_name = '$PARSED_REPO'"
+        fi
         query="
             SELECT w.repo_name, w.issue_number, e.event_type, e.message, e.created_at
             FROM events e
             JOIN workers w ON e.worker_id = w.id
-            WHERE w.issue_number = $issue_filter
+            $where_clause
             ORDER BY e.created_at DESC
             LIMIT 50;
         "
@@ -376,35 +414,44 @@ cmd_events() {
 
 # Stream logs for a specific worker
 cmd_logs() {
-    local issue_number="$1"
+    local issue_arg="$1"
 
-    if [[ -z "$issue_number" ]]; then
-        echo "Error: --logs requires an issue number"
+    if [[ -z "$issue_arg" ]]; then
+        echo "Error: --logs requires an issue number (or repo:issue)"
         exit 1
     fi
 
     init_db
+    parse_issue_arg "$issue_arg"
 
-    # Find the worktree path for this issue
+    local repo_filter=""
+    if [[ -n "$PARSED_REPO" ]]; then
+        repo_filter="AND repo_name='$PARSED_REPO'"
+    fi
+
+    # Find the worktree path for this issue/PR
     local worktree_path
-    worktree_path=$(sqlite3 "$DB_PATH" "SELECT worktree_path FROM workers WHERE issue_number=$issue_number AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")
+    worktree_path=$(sqlite3 "$DB_PATH" "SELECT worktree_path FROM workers WHERE (issue_number=$PARSED_ISSUE OR pr_number=$PARSED_ISSUE) $repo_filter AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")
 
     if [[ -z "$worktree_path" ]]; then
-        echo "Error: No active worker found for issue #$issue_number"
+        echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
         exit 1
     fi
 
+    # Get the worker_id for event queries
+    local worker_id
+    worker_id=$(sqlite3 "$DB_PATH" "SELECT id FROM workers WHERE (issue_number=$PARSED_ISSUE OR pr_number=$PARSED_ISSUE) $repo_filter AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")
+
     # Claude Code stores conversation logs in ~/.claude/
     # For now, we'll show the events as a log stream
-    echo "Events for issue #$issue_number:"
+    echo "Events for #$PARSED_ISSUE${PARSED_REPO:+ ($PARSED_REPO)}:"
     echo "Worktree: $worktree_path"
     echo "-------------------------------------------------------------------------------"
 
     sqlite3 -separator '|' "$DB_PATH" "
         SELECT e.event_type, e.message, e.created_at
         FROM events e
-        JOIN workers w ON e.worker_id = w.id
-        WHERE w.issue_number = $issue_number
+        WHERE e.worker_id = $worker_id
         ORDER BY e.created_at ASC;
     " | while IFS='|' read -r event_type message created_at; do
         echo "[${created_at}] ${event_type}: ${message}"
@@ -413,33 +460,39 @@ cmd_logs() {
     # Also show current status
     echo "-------------------------------------------------------------------------------"
     local status phase pid
-    read -r status phase pid <<< "$(sqlite3 -separator ' ' "$DB_PATH" "SELECT status, phase, pid FROM workers WHERE issue_number=$issue_number AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")"
+    read -r status phase pid <<< "$(sqlite3 -separator ' ' "$DB_PATH" "SELECT status, phase, pid FROM workers WHERE id=$worker_id;")"
     echo "Current status: $status | Phase: $phase | PID: $pid"
 }
 
 # Stop a specific worker
 cmd_stop() {
-    local issue_number="$1"
+    local issue_arg="$1"
 
-    if [[ -z "$issue_number" ]]; then
-        echo "Error: --stop requires an issue number"
+    if [[ -z "$issue_arg" ]]; then
+        echo "Error: --stop requires an issue number (or repo:issue)"
         exit 1
     fi
 
     init_db
+    parse_issue_arg "$issue_arg"
+
+    local repo_filter=""
+    if [[ -n "$PARSED_REPO" ]]; then
+        repo_filter="AND repo_name='$PARSED_REPO'"
+    fi
 
     # Find the worker
     local worker_info
-    worker_info=$(sqlite3 -separator '|' "$DB_PATH" "SELECT id, pid, repo_name FROM workers WHERE issue_number=$issue_number AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")
+    worker_info=$(sqlite3 -separator '|' "$DB_PATH" "SELECT id, pid, repo_name FROM workers WHERE (issue_number=$PARSED_ISSUE OR pr_number=$PARSED_ISSUE) $repo_filter AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")
 
     if [[ -z "$worker_info" ]]; then
-        echo "Error: No active worker found for issue #$issue_number"
+        echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
         exit 1
     fi
 
     IFS='|' read -r worker_id pid repo_name <<< "$worker_info"
 
-    echo "Stopping worker for issue #$issue_number (repo: $repo_name, PID: $pid)..."
+    echo "Stopping worker for #$PARSED_ISSUE (repo: $repo_name, PID: $pid)..."
 
     # Send SIGTERM first, then SIGKILL if needed
     if kill -TERM "$pid" 2>/dev/null; then
@@ -460,13 +513,14 @@ cmd_stop() {
 
 # Send a message to a worker
 cmd_send() {
-    local issue_number="$1"
+    local issue_arg="$1"
     shift
     local message="$*"
 
-    if [[ -z "$issue_number" ]]; then
-        echo "Error: --send requires an issue number"
+    if [[ -z "$issue_arg" ]]; then
+        echo "Error: --send requires an issue number (or repo:issue)"
         echo "Usage: work --send <issue> <message>"
+        echo "       work --send repo:issue <message>"
         echo "       work --send <issue> --type <type> <message>"
         exit 1
     fi
@@ -477,6 +531,7 @@ cmd_send() {
     fi
 
     init_db
+    parse_issue_arg "$issue_arg"
 
     # Parse optional --type flag
     local message_type="info"
@@ -488,15 +543,15 @@ cmd_send() {
 
     # Find the worker
     local worker_id
-    worker_id=$(db_get_worker_by_issue "$issue_number")
+    worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
 
     if [[ -z "$worker_id" ]]; then
-        echo "Error: No active worker found for issue #$issue_number"
+        echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
         exit 1
     fi
 
     db_send_message "$worker_id" "$message_type" "$message"
-    echo "Message sent to worker for issue #$issue_number"
+    echo "Message sent to worker for #$PARSED_ISSUE${PARSED_REPO:+ ($PARSED_REPO)}"
     echo "  Type: $message_type"
     echo "  Message: $message"
 }
@@ -504,26 +559,28 @@ cmd_send() {
 # View messages for a worker (from worker's perspective)
 # Messages are marked as read by default; use --peek to view without marking
 cmd_messages() {
-    local issue_number="${1:-}"
+    local issue_arg="${1:-}"
     local peek_flag="${2:-}"
 
     init_db
 
     # If no issue specified, try to use current worker ID from environment
     local worker_id=""
-    if [[ -n "$issue_number" ]] && [[ "$issue_number" != "--peek" ]]; then
-        worker_id=$(db_get_worker_by_issue "$issue_number")
+    if [[ -n "$issue_arg" ]] && [[ "$issue_arg" != "--peek" ]]; then
+        parse_issue_arg "$issue_arg"
+        worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
         if [[ -z "$worker_id" ]]; then
-            echo "Error: No active worker found for issue #$issue_number"
+            echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
             exit 1
         fi
     elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
         worker_id="$WORK_WORKER_ID"
         # If first arg was --peek, capture it
-        [[ "$issue_number" == "--peek" ]] && peek_flag="--peek"
+        [[ "$issue_arg" == "--peek" ]] && peek_flag="--peek"
     else
-        echo "Error: --messages requires an issue number or must be run from within a worker session"
+        echo "Error: --messages requires an issue number (or repo:issue) or must be run from within a worker session"
         echo "Usage: work --messages [issue] [--peek]"
+        echo "       work --messages [repo:issue] [--peek]"
         exit 1
     fi
 
@@ -557,11 +614,12 @@ cmd_messages() {
 # Set stage for a worker (worker self-reports its current stage)
 cmd_stage() {
     local stage="${1:-}"
-    local issue_number="${2:-}"
+    local issue_arg="${2:-}"
 
     if [[ -z "$stage" ]]; then
         echo "Error: --stage requires a stage name"
         echo "Usage: work --stage <stage> [issue]"
+        echo "       work --stage <stage> [repo:issue]"
         echo ""
         echo "Valid stages:"
         echo "  exploring        - Reading issue, understanding codebase"
@@ -582,17 +640,19 @@ cmd_stage() {
 
     # Find the worker ID
     local worker_id=""
-    if [[ -n "$issue_number" ]]; then
-        worker_id=$(db_get_worker_by_issue "$issue_number")
+    if [[ -n "$issue_arg" ]]; then
+        parse_issue_arg "$issue_arg"
+        worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
         if [[ -z "$worker_id" ]]; then
-            echo "Error: No active worker found for issue #$issue_number"
+            echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
             exit 1
         fi
     elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
         worker_id="$WORK_WORKER_ID"
     else
-        echo "Error: --stage requires an issue number or must be run from within a worker session"
+        echo "Error: --stage requires an issue number (or repo:issue) or must be run from within a worker session"
         echo "Usage: work --stage <stage> [issue]"
+        echo "       work --stage <stage> [repo:issue]"
         exit 1
     fi
 
@@ -846,6 +906,10 @@ run_here() {
     BRANCH_NAME=""
     WORKTREE_PATH=""
 
+    # Get repo name early for worktree path construction
+    local repo_name
+    repo_name=$(basename "$REPO_ROOT")
+
     # Try to parse as issue reference
     if parse_issue_input "$input"; then
         if [[ "$ISSUE_TYPE" == "pull" ]]; then
@@ -897,8 +961,8 @@ run_here() {
     if [[ -n "$WORKTREE_PATH" ]]; then
         echo "Using existing worktree: $WORKTREE_PATH"
     else
-        mkdir -p "$WORKTREE_BASE"
-        WORKTREE_PATH="${WORKTREE_BASE}/${BRANCH_NAME}"
+        mkdir -p "${WORKTREE_BASE}/${repo_name}"
+        WORKTREE_PATH="${WORKTREE_BASE}/${repo_name}/${BRANCH_NAME}"
 
         if [[ -d "$WORKTREE_PATH" ]]; then
             if git -C "$WORKTREE_PATH" rev-parse --git-dir &>/dev/null; then
@@ -1056,8 +1120,6 @@ EOF
     fi
 
     # Register worker in database
-    local repo_name
-    repo_name=$(basename "$REPO_ROOT")
     local worker_id
     worker_id=$(db_register_worker "$REPO_ROOT" "$repo_name" "$ISSUE_NUMBER" "$BRANCH_NAME" "$WORKTREE_PATH" "$$")
     db_log_event "$worker_id" "started" "Worker started for ${task_ref}"
