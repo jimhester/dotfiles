@@ -31,9 +31,10 @@ Monitor and control spawned workers from a parent session:
 ```bash
 # Show all active workers across repos
 work --status
-# repo_name          | issue | status   | phase          | mins_idle
-# hawkins-dash       | 12    | running  | implementation | 2
-# dotfiles           | 45    | ci_wait  | ci_review      | 8
+# repo_name          | issue | stage           | in_stage | pr   | status
+# hawkins-dash       | 12    | implementing    | 15m      | -    | running
+# dotfiles           | 45    | ci_waiting      | 8m       | #47  | running
+# hawkins-dash       | 34    | review_waiting  | 1h       | #46  | running
 
 # Show recent events (optionally filtered by issue)
 work --events
@@ -44,6 +45,30 @@ work --logs 42
 
 # Stop a specific worker
 work --stop 42
+```
+
+## Stage Tracking
+
+Workers report their current stage for better visibility. Stages are:
+
+| Stage | Description |
+|-------|-------------|
+| `exploring` | Reading issue, understanding codebase |
+| `planning` | Designing approach, creating todo list |
+| `implementing` | Writing code |
+| `testing` | Running local tests |
+| `pr_creating` | Creating PR, writing description |
+| `ci_waiting` | PR created, waiting for CI to pass |
+| `review_waiting` | CI passed, waiting for review |
+| `review_responding` | Addressing review feedback |
+| `merge_conflicts` | Resolving merge conflicts |
+| `done` | PR merged or issue closed |
+| `blocked` | Waiting on external dependency |
+
+Workers update their stage via:
+```bash
+work --stage implementing      # Set current stage
+work --stage ci_waiting --pr 47  # Set stage with PR number
 ```
 
 ## Parent-to-Worker Messaging
@@ -75,13 +100,13 @@ Message types:
 3. Creates or reuses a git worktree with branch `issue-{num}-{slug}`
 4. Registers worker in SQLite database for monitoring
 5. Starts Claude Code with a structured prompt for end-to-end completion
-6. Tracks worker status (starting, running, pr_open, ci_waiting, done, failed)
+6. Tracks worker status and stage for visibility into workflow progress
 
 ## Database
 
 Worker state is stored in `~/.worktrees/work-sessions.db` with four tables:
-- `workers` - Active worker metadata (repo, issue, branch, PID, status, phase)
-- `events` - History of status changes and events
+- `workers` - Active worker metadata (repo, issue, branch, PID, status, stage)
+- `events` - History of status changes, stage transitions, and events
 - `completions` - Final summaries when workers complete
 - `messages` - Parent-to-worker message queue
 
