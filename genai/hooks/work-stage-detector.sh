@@ -40,16 +40,17 @@ STDERR=$(echo "$HOOK_INPUT" | jq -r '.tool_response.stderr // empty' 2>/dev/null
 EXIT_CODE=$(echo "$HOOK_INPUT" | jq -r '.tool_response.exitCode // .tool_response.exit_code // "0"' 2>/dev/null || echo "0")
 RESPONSE="${STDOUT}${STDERR}"
 
-# Helper function to update worker status and log event
+# Helper function to update worker status, stage, and log event
 update_worker() {
     local status="$1"
     local phase="$2"
-    local event_type="$3"
-    local message="$4"
+    local stage="$3"
+    local event_type="$4"
+    local message="$5"
 
     sqlite3 "$WORK_DB_PATH" <<SQL
 UPDATE workers
-SET status='$status', phase='$phase', updated_at=CURRENT_TIMESTAMP
+SET status='$status', phase='$phase', stage='$stage', updated_at=CURRENT_TIMESTAMP
 WHERE id=$WORK_WORKER_ID;
 
 INSERT INTO events (worker_id, event_type, message)
@@ -72,7 +73,7 @@ update_pr_info() {
 
     sqlite3 "$WORK_DB_PATH" <<SQL
 UPDATE workers
-SET pr_number=$pr_number, pr_url='$pr_url', status='ci_waiting', phase='ci_review', updated_at=CURRENT_TIMESTAMP
+SET pr_number=$pr_number, pr_url='$pr_url', status='ci_waiting', phase='ci_review', stage='ci_waiting', updated_at=CURRENT_TIMESTAMP
 WHERE id=$WORK_WORKER_ID;
 
 INSERT INTO events (worker_id, event_type, message)
@@ -104,7 +105,7 @@ if [[ "$COMMAND" =~ gh[e]?[[:space:]]+pr[[:space:]]+checks ]]; then
             log_event "ci_failure" "CI checks failed"
         elif echo "$STDOUT" | grep -qiE '(pass|success|✓)' && ! echo "$STDOUT" | grep -qiE '(pending|running|queued)'; then
             # All checks passed - transition to review_waiting
-            update_worker "review_waiting" "review" "ci_passed" "All CI checks passed"
+            update_worker "review_waiting" "review" "review_waiting" "ci_passed" "All CI checks passed"
         fi
     else
         # Non-watch mode: just log the check
@@ -112,7 +113,7 @@ if [[ "$COMMAND" =~ gh[e]?[[:space:]]+pr[[:space:]]+checks ]]; then
             log_event "ci_check" "CI checks show failures"
         elif echo "$STDOUT" | grep -qiE '(pass|success|✓)'; then
             if ! echo "$STDOUT" | grep -qiE '(pending|running|queued)'; then
-                update_worker "review_waiting" "review" "ci_passed" "All CI checks passed"
+                update_worker "review_waiting" "review" "review_waiting" "ci_passed" "All CI checks passed"
             fi
         fi
     fi
@@ -123,7 +124,7 @@ fi
 if [[ "$COMMAND" =~ gh[e]?[[:space:]]+pr[[:space:]]+merge ]] && [[ "$EXIT_CODE" == "0" ]]; then
     # Check if merge was successful from output
     if echo "$RESPONSE" | grep -qiE '(merged|successfully)'; then
-        update_worker "merged" "follow_up" "pr_merged" "PR merged successfully"
+        update_worker "merged" "follow_up" "done" "pr_merged" "PR merged successfully"
     fi
     exit 0
 fi
@@ -134,7 +135,7 @@ if [[ "$COMMAND" =~ git[[:space:]]+(rebase|merge)[[:space:]]+--continue ]] && [[
     # Get current status to see if we were in merge_conflicts
     CURRENT_STATUS=$(sqlite3 "$WORK_DB_PATH" "SELECT status FROM workers WHERE id=$WORK_WORKER_ID;")
     if [[ "$CURRENT_STATUS" == "merge_conflicts" ]]; then
-        update_worker "running" "implementation" "conflict_resolved" "Merge conflicts resolved"
+        update_worker "running" "implementation" "implementing" "conflict_resolved" "Merge conflicts resolved"
     fi
     exit 0
 fi
@@ -142,7 +143,7 @@ fi
 # Detect merge conflicts from git rebase or git merge
 if [[ "$COMMAND" =~ git[[:space:]]+(rebase|merge|pull) ]]; then
     if echo "$RESPONSE" | grep -qiE '(CONFLICT|conflict|Automatic merge failed)'; then
-        update_worker "merge_conflicts" "blocked" "conflict_detected" "Merge conflict detected"
+        update_worker "merge_conflicts" "blocked" "merge_conflicts" "conflict_detected" "Merge conflict detected"
     fi
     exit 0
 fi
