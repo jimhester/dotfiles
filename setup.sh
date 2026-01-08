@@ -74,8 +74,11 @@ make_link ~/.colemak "$DOTFILES_DIR/colemak/"
 # Work script for Claude Code
 make_link ~/.local/bin/work "$DOTFILES_DIR/genai/work"
 
-# Claude code skills
+# Claude Code skills
 make_link ~/.claude/skills/work "$DOTFILES_DIR/genai/skills/work"
+
+# Claude Code hooks for auto-detecting work stages
+"$DOTFILES_DIR/genai/hooks/install-hooks.sh"
 
 # Git config
 git config --global core.excludesfile "$DOTFILES_DIR/.gitignore"
