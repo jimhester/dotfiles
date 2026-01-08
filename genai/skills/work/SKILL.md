@@ -44,6 +44,28 @@ work --logs 42
 work --stop 42
 ```
 
+## Parent-to-Worker Messaging
+
+Send messages from a parent session to workers:
+
+```bash
+# Send a message to a worker
+work --send 42 "Check the updated API spec before continuing"
+work --send 42 --type priority "This is now high priority"
+work --send 42 --type context "The database schema changed, see PR #123"
+
+# View pending messages (from parent or worker)
+work --messages 42              # View messages for issue #42
+work --messages                 # From within worker, uses WORK_WORKER_ID
+work --messages 42 --mark-read  # View and mark as read
+```
+
+Message types:
+- `info` (default) - General information
+- `priority` - Priority change notifications
+- `context` - Additional context or requirements
+- `instruction` - Specific instructions to follow
+
 ## What it does
 
 1. Parses GitHub issue/PR URLs or numbers
@@ -55,10 +77,11 @@ work --stop 42
 
 ## Database
 
-Worker state is stored in `~/.worktrees/work-sessions.db` with three tables:
+Worker state is stored in `~/.worktrees/work-sessions.db` with four tables:
 - `workers` - Active worker metadata (repo, issue, branch, PID, status, phase)
 - `events` - History of status changes and events
 - `completions` - Final summaries when workers complete
+- `messages` - Parent-to-worker message queue
 
 ## Environment variables
 
@@ -78,6 +101,7 @@ If the user wants to:
 - Create an isolated environment for a task
 - Monitor status of running workers
 - Stop a runaway worker process
+- Send messages/instructions to running workers
 
 Suggest they exit the current session and run `work <issue>` from their terminal.
 
