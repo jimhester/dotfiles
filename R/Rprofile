@@ -1,7 +1,7 @@
 #options(repos = 'https://cloud.r-project.org')
-options(repos = c(NFLX = "http://repo.test.netflix.net/netflix-cran")
-#    , CRAN="https://cloud.r-project.org")
-)
+if (.Platform$OS.type == "unix") {
+  options(repos = c(CRAN = sprintf("https://p3m.dev/cran/latest/bin/linux/manylinux_2_28-%s/%s", R.version["arch"], substr(getRversion(), 1, 3))))
+}
 # .Rprofile -- commands to execute at the beginning of each R session
 #
 # You can use this file to load packages, set options, etc.

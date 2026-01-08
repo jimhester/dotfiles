@@ -6,7 +6,7 @@ if [[ "$OSTYPE" == darwin* ]]; then
     export PATH=.:$HOME/bin:/opt/nflx/bin:$HOME/.local/bin:/usr/local/opt/ccache/libexec:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:./node_modules/.bin:$HOME/Library/Python/3.7/bin
 else
     # Linux/WSL
-    export PATH=.:$HOME/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:./node_modules/.bin
+    export PATH=.:$HOME/bin:$HOME/.local/bin:$HOME/.local/share/nvim/mason/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:./node_modules/.bin
 fi
 #history base for per directory history
 export HISTORY_BASE=$HOME/.directory_history
