@@ -39,7 +39,8 @@ Worker Management:
   $(basename "$0") --logs <issue>              # Stream worker output
   $(basename "$0") --stop <issue>              # Signal worker to stop
   $(basename "$0") --send <issue> <message>    # Send message to worker
-  $(basename "$0") --messages [issue]          # View pending messages
+  $(basename "$0") --messages [issue]          # View and mark messages as read
+  $(basename "$0") --messages [issue] --peek   # View without marking as read
 
 Options:
   --here       Run in current terminal instead of spawning new tab
@@ -48,7 +49,7 @@ Options:
   --logs       Tail logs for a specific worker
   --stop       Terminate a specific worker
   --send       Send a message to a worker (use --type <type> for custom types)
-  --messages   View pending messages (from worker or parent perspective)
+  --messages   View pending messages (marks as read by default; use --peek to keep unread)
   --help       Show this help message
 
 Environment:
@@ -471,15 +472,16 @@ cmd_send() {
 }
 
 # View messages for a worker (from worker's perspective)
+# Messages are marked as read by default; use --peek to view without marking
 cmd_messages() {
     local issue_number="${1:-}"
-    local mark_read="${2:-}"
+    local peek_flag="${2:-}"
 
     init_db
 
     # If no issue specified, try to use current worker ID from environment
     local worker_id=""
-    if [[ -n "$issue_number" ]]; then
+    if [[ -n "$issue_number" ]] && [[ "$issue_number" != "--peek" ]]; then
         worker_id=$(db_get_worker_by_issue "$issue_number")
         if [[ -z "$worker_id" ]]; then
             echo "Error: No active worker found for issue #$issue_number"
@@ -487,9 +489,11 @@ cmd_messages() {
         fi
     elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
         worker_id="$WORK_WORKER_ID"
+        # If first arg was --peek, capture it
+        [[ "$issue_number" == "--peek" ]] && peek_flag="--peek"
     else
         echo "Error: --messages requires an issue number or must be run from within a worker session"
-        echo "Usage: work --messages <issue> [--mark-read]"
+        echo "Usage: work --messages [issue] [--peek]"
         exit 1
     fi
 
@@ -504,17 +508,19 @@ cmd_messages() {
     echo "Unread Messages ($count):"
     echo "-------------------------------------------------------------------------------"
 
-    local should_mark="false"
-    [[ "$mark_read" == "--mark-read" ]] && should_mark="true"
+    # Mark as read by default, unless --peek is specified
+    local should_mark="true"
+    [[ "$peek_flag" == "--peek" ]] && should_mark="false"
 
     db_get_messages "$worker_id" "$should_mark" | while IFS='|' read -r msg_id msg_type payload created_at; do
         echo "[$created_at] ($msg_type) $payload"
-        echo "  ID: $msg_id"
     done
 
+    echo "-------------------------------------------------------------------------------"
     if [[ "$should_mark" == "true" ]]; then
-        echo "-------------------------------------------------------------------------------"
         echo "All messages marked as read."
+    else
+        echo "(Peek mode - messages NOT marked as read)"
     fi
 }
 
