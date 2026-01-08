@@ -41,6 +41,7 @@ Worker Management:
   $(basename "$0") --send <issue> <message>    # Send message to worker
   $(basename "$0") --messages [issue]          # View and mark messages as read
   $(basename "$0") --messages [issue] --peek   # View without marking as read
+  $(basename "$0") --stage <stage> [--pr N]    # Set current work stage (from worker)
 
 Options:
   --here       Run in current terminal instead of spawning new tab
@@ -50,7 +51,12 @@ Options:
   --stop       Terminate a specific worker
   --send       Send a message to a worker (use --type <type> for custom types)
   --messages   View pending messages (marks as read by default; use --peek to keep unread)
+  --stage      Set current work stage (must be run from worker session)
   --help       Show this help message
+
+Stages:
+  exploring, planning, implementing, testing, pr_creating,
+  ci_waiting, review_waiting, review_responding, merge_conflicts, done, blocked
 
 Environment:
   MAIN_BRANCH    Base branch for new branches (default: main)
@@ -78,6 +84,8 @@ CREATE TABLE IF NOT EXISTS workers (
     pid INTEGER,
     status TEXT DEFAULT 'starting',
     phase TEXT DEFAULT 'implementation',
+    stage TEXT DEFAULT 'exploring',
+    stage_changed_at TEXT DEFAULT CURRENT_TIMESTAMP,
     pr_number INTEGER,
     pr_url TEXT,
     started_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -122,6 +130,17 @@ CREATE INDEX IF NOT EXISTS idx_events_time ON events(created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_worker ON messages(worker_id);
 CREATE INDEX IF NOT EXISTS idx_messages_unread ON messages(worker_id, read_at);
 SQL
+
+    # Migrate existing databases: add stage and stage_changed_at columns if missing
+    # Note: SQLite doesn't allow CURRENT_TIMESTAMP as default in ALTER TABLE, so we use NULL
+    # and update existing rows separately
+    if ! sqlite3 "$DB_PATH" "SELECT stage FROM workers LIMIT 1;" &>/dev/null; then
+        sqlite3 "$DB_PATH" "ALTER TABLE workers ADD COLUMN stage TEXT DEFAULT 'exploring';" 2>/dev/null || true
+    fi
+    if ! sqlite3 "$DB_PATH" "SELECT stage_changed_at FROM workers LIMIT 1;" &>/dev/null; then
+        sqlite3 "$DB_PATH" "ALTER TABLE workers ADD COLUMN stage_changed_at TEXT;" 2>/dev/null || true
+        sqlite3 "$DB_PATH" "UPDATE workers SET stage_changed_at = COALESCE(updated_at, CURRENT_TIMESTAMP) WHERE stage_changed_at IS NULL;" 2>/dev/null || true
+    fi
 }
 
 # Register a new worker in the database
@@ -138,8 +157,8 @@ db_register_worker() {
 
     # Use INSERT OR REPLACE to handle re-runs on the same branch
     sqlite3 "$DB_PATH" <<SQL
-INSERT OR REPLACE INTO workers (repo_path, repo_name, issue_number, branch, worktree_path, pid, status, phase, started_at, updated_at)
-VALUES ('$repo_path', '$repo_name', ${issue_number:-NULL}, '$branch', '$worktree_path', $pid, 'starting', 'implementation', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT OR REPLACE INTO workers (repo_path, repo_name, issue_number, branch, worktree_path, pid, status, phase, stage, stage_changed_at, started_at, updated_at)
+VALUES ('$repo_path', '$repo_name', ${issue_number:-NULL}, '$branch', '$worktree_path', $pid, 'starting', 'implementation', 'exploring', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 SQL
 
     # Return the worker ID
@@ -157,6 +176,30 @@ db_update_status() {
     else
         sqlite3 "$DB_PATH" "UPDATE workers SET status='$status', updated_at=CURRENT_TIMESTAMP WHERE id=$worker_id;"
     fi
+}
+
+# Valid stages for workers
+VALID_STAGES="exploring planning implementing testing pr_creating ci_waiting review_waiting review_responding merge_conflicts done blocked"
+
+# Validate a stage name
+is_valid_stage() {
+    local stage="$1"
+    [[ " $VALID_STAGES " == *" $stage "* ]]
+}
+
+# Update worker stage
+db_update_stage() {
+    local worker_id="$1"
+    local stage="$2"
+
+    if ! is_valid_stage "$stage"; then
+        echo "Error: Invalid stage '$stage'"
+        echo "Valid stages: $VALID_STAGES"
+        return 1
+    fi
+
+    sqlite3 "$DB_PATH" "UPDATE workers SET stage='$stage', stage_changed_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=$worker_id;"
+    db_log_event "$worker_id" "stage_change" "Stage changed to: $stage"
 }
 
 # Update worker with PR information
@@ -290,23 +333,34 @@ cmd_status() {
     db_cleanup_stale_workers
 
     echo "Active Workers:"
-    echo "-------------------------------------------------------------------------------"
-    printf "%-20s | %-6s | %-10s | %-14s | %s\n" "repo_name" "issue" "status" "phase" "mins_idle"
-    echo "-------------------------------------------------------------------------------"
+    echo "-----------------------------------------------------------------------------------------------------------"
+    printf "%-20s | %-6s | %-17s | %-8s | %-6s | %s\n" "repo_name" "issue" "stage" "in_stage" "pr" "status"
+    echo "-----------------------------------------------------------------------------------------------------------"
 
     sqlite3 -separator '|' "$DB_PATH" "
-        SELECT repo_name, COALESCE(issue_number, '-'), status, phase,
-               CAST((julianday('now') - julianday(updated_at)) * 24 * 60 AS INTEGER)
+        SELECT repo_name, COALESCE(issue_number, '-'), stage,
+               CAST((julianday('now') - julianday(stage_changed_at)) * 24 * 60 AS INTEGER),
+               COALESCE(CAST(pr_number AS TEXT), '-'),
+               status
         FROM workers
         WHERE status NOT IN ('done', 'failed')
         ORDER BY updated_at DESC;
-    " | while IFS='|' read -r repo_name issue status phase mins_idle; do
-        printf "%-20s | %-6s | %-10s | %-14s | %s\n" "$repo_name" "$issue" "$status" "$phase" "$mins_idle"
+    " | while IFS='|' read -r repo_name issue stage mins_in_stage pr_num status; do
+        # Format time in stage (e.g., "5m", "2h", "1d")
+        local time_str
+        if [[ "$mins_in_stage" -lt 60 ]]; then
+            time_str="${mins_in_stage}m"
+        elif [[ "$mins_in_stage" -lt 1440 ]]; then
+            time_str="$((mins_in_stage / 60))h"
+        else
+            time_str="$((mins_in_stage / 1440))d"
+        fi
+        printf "%-20s | %-6s | %-17s | %-8s | %-6s | %s\n" "$repo_name" "$issue" "$stage" "$time_str" "$pr_num" "$status"
     done
 
     local count
     count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM workers WHERE status NOT IN ('done', 'failed');")
-    echo "-------------------------------------------------------------------------------"
+    echo "-----------------------------------------------------------------------------------------------------------"
     echo "Total active workers: $count"
 }
 
@@ -469,6 +523,81 @@ cmd_send() {
     echo "Message sent to worker for issue #$issue_number"
     echo "  Type: $message_type"
     echo "  Message: $message"
+}
+
+# Set stage for a worker
+cmd_stage() {
+    local stage="${1:-}"
+
+    if [[ -z "$stage" ]]; then
+        echo "Error: --stage requires a stage name"
+        echo "Usage: work --stage <stage> [--pr <number>]"
+        echo ""
+        echo "Valid stages:"
+        echo "  exploring        - Reading issue, understanding codebase"
+        echo "  planning         - Designing approach, creating todo list"
+        echo "  implementing     - Writing code"
+        echo "  testing          - Running local tests"
+        echo "  pr_creating      - Creating PR, writing description"
+        echo "  ci_waiting       - PR created, waiting for CI to pass"
+        echo "  review_waiting   - CI passed, waiting for review"
+        echo "  review_responding - Addressing review feedback"
+        echo "  merge_conflicts  - Resolving merge conflicts"
+        echo "  done             - PR merged or issue closed"
+        echo "  blocked          - Waiting on external dependency"
+        exit 1
+    fi
+
+    shift
+
+    # Parse optional --pr flag
+    local pr_number=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --pr)
+                pr_number="$2"
+                shift 2
+                ;;
+            *)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+
+    init_db
+
+    # Get worker ID from environment or fail
+    local worker_id="${WORK_WORKER_ID:-}"
+    if [[ -z "$worker_id" ]]; then
+        echo "Error: --stage must be run from within a worker session (WORK_WORKER_ID not set)"
+        exit 1
+    fi
+
+    if ! is_valid_stage "$stage"; then
+        echo "Error: Invalid stage '$stage'"
+        echo "Valid stages: $VALID_STAGES"
+        exit 1
+    fi
+
+    db_update_stage "$worker_id" "$stage"
+
+    # If PR number provided, update that too
+    if [[ -n "$pr_number" ]]; then
+        local pr_url
+        local remote_url
+        remote_url=$(git remote get-url origin 2>/dev/null || echo "")
+        if [[ "$remote_url" =~ github\.com[:/]([^/]+)/([^/.]+) ]]; then
+            local owner="${BASH_REMATCH[1]}"
+            local repo="${BASH_REMATCH[2]}"
+            pr_url="https://github.com/${owner}/${repo}/pull/${pr_number}"
+        else
+            pr_url=""
+        fi
+        sqlite3 "$DB_PATH" "UPDATE workers SET pr_number=$pr_number, pr_url='$pr_url', updated_at=CURRENT_TIMESTAMP WHERE id=$worker_id;"
+    fi
+
+    echo "Stage updated to: $stage"
 }
 
 # View messages for a worker (from worker's perspective)
@@ -937,6 +1066,31 @@ Then output a summary including:
 - **Key decisions made**: Any architectural or implementation choices
 - **Follow-up issues created**: Links to any issues created for future work
 
+## Stage Tracking (IMPORTANT)
+Report your current stage as you progress through the workflow. This helps monitor parallel workers and identify bottlenecks.
+
+**Update your stage when transitioning between phases:**
+\`\`\`bash
+work --stage exploring       # Reading issue, understanding codebase
+work --stage planning        # Designing approach, creating todo list
+work --stage implementing    # Writing code
+work --stage testing         # Running local tests
+work --stage pr_creating     # Creating PR, writing description
+work --stage ci_waiting --pr <NUMBER>  # PR created, waiting for CI
+work --stage review_waiting  # CI passed, waiting for review
+work --stage review_responding  # Addressing review feedback
+work --stage merge_conflicts # Resolving merge conflicts
+work --stage done            # PR merged or issue closed
+work --stage blocked         # Waiting on external dependency
+\`\`\`
+
+**Stage transitions map to workflow phases:**
+- Phase 1 (Implementation): exploring → planning → implementing → testing
+- Phase 2 (Pull Request): pr_creating
+- Phase 3 (CI & Review): ci_waiting → review_waiting → review_responding (may cycle)
+- Phase 4 (Merge): done
+- Any time: blocked (with explanation), merge_conflicts
+
 ## Guidelines
 - Be thorough but avoid over-engineering
 - Write clear commit messages explaining the "why"
@@ -1029,6 +1183,10 @@ main() {
         --messages)
             shift
             cmd_messages "$@"
+            ;;
+        --stage)
+            shift
+            cmd_stage "$@"
             ;;
         --here)
             # Run in current terminal
