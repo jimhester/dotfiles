@@ -38,14 +38,18 @@ Worker Management:
   $(basename "$0") --events [issue]            # Show recent events (optionally filtered)
   $(basename "$0") --logs <issue>              # Stream worker output
   $(basename "$0") --stop <issue>              # Signal worker to stop
+  $(basename "$0") --send <issue> <message>    # Send message to worker
+  $(basename "$0") --messages [issue]          # View pending messages
 
 Options:
-  --here     Run in current terminal instead of spawning new tab
-  --status   Show status of all active workers across repos
-  --events   Show recent worker events
-  --logs     Tail logs for a specific worker
-  --stop     Terminate a specific worker
-  --help     Show this help message
+  --here       Run in current terminal instead of spawning new tab
+  --status     Show status of all active workers across repos
+  --events     Show recent worker events
+  --logs       Tail logs for a specific worker
+  --stop       Terminate a specific worker
+  --send       Send a message to a worker (use --type <type> for custom types)
+  --messages   View pending messages (from worker or parent perspective)
+  --help       Show this help message
 
 Environment:
   MAIN_BRANCH    Base branch for new branches (default: main)
@@ -101,10 +105,21 @@ CREATE TABLE IF NOT EXISTS completions (
     completed_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY,
+    worker_id INTEGER REFERENCES workers(id),
+    message_type TEXT DEFAULT 'info',
+    payload TEXT,
+    read_at TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_workers_status ON workers(status);
 CREATE INDEX IF NOT EXISTS idx_workers_repo ON workers(repo_path);
 CREATE INDEX IF NOT EXISTS idx_events_worker ON events(worker_id);
 CREATE INDEX IF NOT EXISTS idx_events_time ON events(created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_worker ON messages(worker_id);
+CREATE INDEX IF NOT EXISTS idx_messages_unread ON messages(worker_id, read_at);
 SQL
 }
 
@@ -220,6 +235,48 @@ db_cleanup_stale_workers() {
             db_log_event "$worker_id" "cleanup" "Process $pid no longer running"
         fi
     done <<< "$stale_pids"
+}
+
+# Send a message to a worker
+db_send_message() {
+    local worker_id="$1"
+    local message_type="$2"
+    local payload="$3"
+
+    # Escape single quotes in payload
+    payload="${payload//\'/\'\'}"
+
+    sqlite3 "$DB_PATH" "INSERT INTO messages (worker_id, message_type, payload) VALUES ($worker_id, '$message_type', '$payload');"
+    db_log_event "$worker_id" "message_sent" "$message_type: $payload"
+}
+
+# Get unread messages for a worker
+db_get_messages() {
+    local worker_id="$1"
+    local mark_read="${2:-false}"
+
+    sqlite3 -separator '|' "$DB_PATH" "
+        SELECT id, message_type, payload, created_at
+        FROM messages
+        WHERE worker_id = $worker_id AND read_at IS NULL
+        ORDER BY created_at ASC;
+    "
+
+    if [[ "$mark_read" == "true" ]]; then
+        sqlite3 "$DB_PATH" "UPDATE messages SET read_at = CURRENT_TIMESTAMP WHERE worker_id = $worker_id AND read_at IS NULL;"
+    fi
+}
+
+# Mark specific message as read
+db_mark_message_read() {
+    local message_id="$1"
+    sqlite3 "$DB_PATH" "UPDATE messages SET read_at = CURRENT_TIMESTAMP WHERE id = $message_id;"
+}
+
+# Get message count for a worker
+db_get_message_count() {
+    local worker_id="$1"
+    sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM messages WHERE worker_id = $worker_id AND read_at IS NULL;"
 }
 
 # ============================================================================
@@ -367,6 +424,97 @@ cmd_stop() {
         echo "Process $pid is not running. Marking as failed."
         db_update_status "$worker_id" "failed"
         db_log_event "$worker_id" "cleanup" "Process not found when attempting to stop"
+    fi
+}
+
+# Send a message to a worker
+cmd_send() {
+    local issue_number="$1"
+    shift
+    local message="$*"
+
+    if [[ -z "$issue_number" ]]; then
+        echo "Error: --send requires an issue number"
+        echo "Usage: work --send <issue> <message>"
+        echo "       work --send <issue> --type <type> <message>"
+        exit 1
+    fi
+
+    if [[ -z "$message" ]]; then
+        echo "Error: --send requires a message"
+        exit 1
+    fi
+
+    init_db
+
+    # Parse optional --type flag
+    local message_type="info"
+    if [[ "$message" == --type* ]]; then
+        message_type="${message#--type }"
+        message_type="${message_type%% *}"
+        message="${message#--type $message_type }"
+    fi
+
+    # Find the worker
+    local worker_id
+    worker_id=$(db_get_worker_by_issue "$issue_number")
+
+    if [[ -z "$worker_id" ]]; then
+        echo "Error: No active worker found for issue #$issue_number"
+        exit 1
+    fi
+
+    db_send_message "$worker_id" "$message_type" "$message"
+    echo "Message sent to worker for issue #$issue_number"
+    echo "  Type: $message_type"
+    echo "  Message: $message"
+}
+
+# View messages for a worker (from worker's perspective)
+cmd_messages() {
+    local issue_number="${1:-}"
+    local mark_read="${2:-}"
+
+    init_db
+
+    # If no issue specified, try to use current worker ID from environment
+    local worker_id=""
+    if [[ -n "$issue_number" ]]; then
+        worker_id=$(db_get_worker_by_issue "$issue_number")
+        if [[ -z "$worker_id" ]]; then
+            echo "Error: No active worker found for issue #$issue_number"
+            exit 1
+        fi
+    elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
+        worker_id="$WORK_WORKER_ID"
+    else
+        echo "Error: --messages requires an issue number or must be run from within a worker session"
+        echo "Usage: work --messages <issue> [--mark-read]"
+        exit 1
+    fi
+
+    local count
+    count=$(db_get_message_count "$worker_id")
+
+    if [[ "$count" -eq 0 ]]; then
+        echo "No unread messages."
+        return 0
+    fi
+
+    echo "Unread Messages ($count):"
+    echo "-------------------------------------------------------------------------------"
+
+    local should_mark="false"
+    [[ "$mark_read" == "--mark-read" ]] && should_mark="true"
+
+    db_get_messages "$worker_id" "$should_mark" | while IFS='|' read -r msg_id msg_type payload created_at; do
+        echo "[$created_at] ($msg_type) $payload"
+        echo "  ID: $msg_id"
+    done
+
+    if [[ "$should_mark" == "true" ]]; then
+        echo "-------------------------------------------------------------------------------"
+        echo "All messages marked as read."
     fi
 }
 
@@ -789,6 +937,11 @@ Then output a summary including:
 - Keep PR description updated with significant changes
 - Follow any project-specific guidelines in CLAUDE.md
 - If blocked by external factors (permissions, unclear requirements), explain and stop
+- **Check for messages**: Periodically check for messages from the parent session:
+  \`\`\`bash
+  work --messages  # Uses WORK_WORKER_ID from environment
+  \`\`\`
+  Messages may contain priority changes, additional context, or instructions.
 EOF
 )
 
@@ -862,6 +1015,14 @@ main() {
         --stop)
             shift
             cmd_stop "$1"
+            ;;
+        --send)
+            shift
+            cmd_send "$@"
+            ;;
+        --messages)
+            shift
+            cmd_messages "$@"
             ;;
         --here)
             # Run in current terminal
