@@ -14,9 +14,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-WORKTREE_BASE="${REPO_ROOT}/../worktrees"
+WORKTREE_BASE="${WORKTREE_BASE:-${HOME}/.worktrees}"
 MAIN_BRANCH="${MAIN_BRANCH:-main}"
 SPAWN_DELAY="${SPAWN_DELAY:-0.5}"
+DB_PATH="${WORKTREE_BASE}/work-sessions.db"
 
 usage() {
     cat <<EOF
@@ -32,17 +33,346 @@ Examples:
   $(basename "$0") --here 42 "fix memory leak"  # Run in current terminal
   $(basename "$0") "add dark mode support"      # New feature branch
 
+Worker Management:
+  $(basename "$0") --status                    # Show all active workers
+  $(basename "$0") --events [issue]            # Show recent events (optionally filtered)
+  $(basename "$0") --logs <issue>              # Stream worker output
+  $(basename "$0") --stop <issue>              # Signal worker to stop
+
 Options:
   --here     Run in current terminal instead of spawning new tab
+  --status   Show status of all active workers across repos
+  --events   Show recent worker events
+  --logs     Tail logs for a specific worker
+  --stop     Terminate a specific worker
   --help     Show this help message
 
 Environment:
   MAIN_BRANCH    Base branch for new branches (default: main)
-  WORKTREE_BASE  Directory for worktrees (default: ../worktrees)
+  WORKTREE_BASE  Directory for worktrees (default: ~/.worktrees)
   SPAWN_DELAY    Delay between spawns in seconds (default: 0.5)
 EOF
     exit 1
 }
+
+# ============================================================================
+# SQLite Database Functions
+# ============================================================================
+
+# Initialize the SQLite database with required tables
+init_db() {
+    mkdir -p "$(dirname "$DB_PATH")"
+    sqlite3 "$DB_PATH" <<'SQL'
+CREATE TABLE IF NOT EXISTS workers (
+    id INTEGER PRIMARY KEY,
+    repo_path TEXT,
+    repo_name TEXT,
+    issue_number INTEGER,
+    branch TEXT,
+    worktree_path TEXT,
+    pid INTEGER,
+    status TEXT DEFAULT 'starting',
+    phase TEXT DEFAULT 'implementation',
+    pr_number INTEGER,
+    pr_url TEXT,
+    started_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(repo_path, branch)
+);
+
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY,
+    worker_id INTEGER REFERENCES workers(id),
+    event_type TEXT,
+    message TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS completions (
+    id INTEGER PRIMARY KEY,
+    worker_id INTEGER REFERENCES workers(id),
+    summary TEXT,
+    files_changed TEXT,
+    tests_added TEXT,
+    pr_url TEXT,
+    merged BOOLEAN,
+    follow_up_issues TEXT,
+    lessons_learned TEXT,
+    completed_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_workers_status ON workers(status);
+CREATE INDEX IF NOT EXISTS idx_workers_repo ON workers(repo_path);
+CREATE INDEX IF NOT EXISTS idx_events_worker ON events(worker_id);
+CREATE INDEX IF NOT EXISTS idx_events_time ON events(created_at);
+SQL
+}
+
+# Register a new worker in the database
+# Returns the worker ID
+db_register_worker() {
+    local repo_path="$1"
+    local repo_name="$2"
+    local issue_number="$3"
+    local branch="$4"
+    local worktree_path="$5"
+    local pid="$6"
+
+    init_db
+
+    # Use INSERT OR REPLACE to handle re-runs on the same branch
+    sqlite3 "$DB_PATH" <<SQL
+INSERT OR REPLACE INTO workers (repo_path, repo_name, issue_number, branch, worktree_path, pid, status, phase, started_at, updated_at)
+VALUES ('$repo_path', '$repo_name', ${issue_number:-NULL}, '$branch', '$worktree_path', $pid, 'starting', 'implementation', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+SQL
+
+    # Return the worker ID
+    sqlite3 "$DB_PATH" "SELECT id FROM workers WHERE repo_path='$repo_path' AND branch='$branch';"
+}
+
+# Update worker status
+db_update_status() {
+    local worker_id="$1"
+    local status="$2"
+    local phase="${3:-}"
+
+    if [[ -n "$phase" ]]; then
+        sqlite3 "$DB_PATH" "UPDATE workers SET status='$status', phase='$phase', updated_at=CURRENT_TIMESTAMP WHERE id=$worker_id;"
+    else
+        sqlite3 "$DB_PATH" "UPDATE workers SET status='$status', updated_at=CURRENT_TIMESTAMP WHERE id=$worker_id;"
+    fi
+}
+
+# Update worker with PR information
+db_update_pr() {
+    local worker_id="$1"
+    local pr_number="$2"
+    local pr_url="$3"
+
+    sqlite3 "$DB_PATH" "UPDATE workers SET pr_number=$pr_number, pr_url='$pr_url', status='pr_open', phase='ci_review', updated_at=CURRENT_TIMESTAMP WHERE id=$worker_id;"
+}
+
+# Log an event for a worker
+db_log_event() {
+    local worker_id="$1"
+    local event_type="$2"
+    local message="$3"
+
+    sqlite3 "$DB_PATH" "INSERT INTO events (worker_id, event_type, message) VALUES ($worker_id, '$event_type', '$message');"
+}
+
+# Store completion summary
+db_store_completion() {
+    local worker_id="$1"
+    local summary="$2"
+    local files_changed="$3"
+    local tests_added="$4"
+    local pr_url="$5"
+    local merged="$6"
+    local follow_up_issues="$7"
+    local lessons_learned="$8"
+
+    sqlite3 "$DB_PATH" <<SQL
+INSERT INTO completions (worker_id, summary, files_changed, tests_added, pr_url, merged, follow_up_issues, lessons_learned)
+VALUES ($worker_id, '$summary', '$files_changed', '$tests_added', '$pr_url', $merged, '$follow_up_issues', '$lessons_learned');
+SQL
+
+    db_update_status "$worker_id" "done"
+}
+
+# Mark worker as failed
+db_mark_failed() {
+    local worker_id="$1"
+    local reason="${2:-unknown}"
+
+    db_update_status "$worker_id" "failed"
+    db_log_event "$worker_id" "failed" "$reason"
+}
+
+# Get worker ID by issue number (searches across all repos)
+db_get_worker_by_issue() {
+    local issue_number="$1"
+    sqlite3 "$DB_PATH" "SELECT id FROM workers WHERE issue_number=$issue_number AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;"
+}
+
+# Get worker ID by branch name
+db_get_worker_by_branch() {
+    local branch="$1"
+    sqlite3 "$DB_PATH" "SELECT id FROM workers WHERE branch='$branch' AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;"
+}
+
+# Check if a worker process is still running
+is_worker_alive() {
+    local pid="$1"
+    kill -0 "$pid" 2>/dev/null
+}
+
+# Clean up stale workers (processes that are no longer running)
+db_cleanup_stale_workers() {
+    init_db
+
+    local stale_pids
+    stale_pids=$(sqlite3 "$DB_PATH" "SELECT id, pid FROM workers WHERE status NOT IN ('done', 'failed');")
+
+    while IFS='|' read -r worker_id pid; do
+        if [[ -n "$worker_id" ]] && ! is_worker_alive "$pid"; then
+            db_update_status "$worker_id" "failed"
+            db_log_event "$worker_id" "cleanup" "Process $pid no longer running"
+        fi
+    done <<< "$stale_pids"
+}
+
+# ============================================================================
+# Management Commands
+# ============================================================================
+
+# Show status of all active workers
+cmd_status() {
+    init_db
+    db_cleanup_stale_workers
+
+    echo "Active Workers:"
+    echo "-------------------------------------------------------------------------------"
+    printf "%-20s | %-6s | %-10s | %-14s | %s\n" "repo_name" "issue" "status" "phase" "mins_idle"
+    echo "-------------------------------------------------------------------------------"
+
+    sqlite3 -separator '|' "$DB_PATH" "
+        SELECT repo_name, COALESCE(issue_number, '-'), status, phase,
+               CAST((julianday('now') - julianday(updated_at)) * 24 * 60 AS INTEGER)
+        FROM workers
+        WHERE status NOT IN ('done', 'failed')
+        ORDER BY updated_at DESC;
+    " | while IFS='|' read -r repo_name issue status phase mins_idle; do
+        printf "%-20s | %-6s | %-10s | %-14s | %s\n" "$repo_name" "$issue" "$status" "$phase" "$mins_idle"
+    done
+
+    local count
+    count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM workers WHERE status NOT IN ('done', 'failed');")
+    echo "-------------------------------------------------------------------------------"
+    echo "Total active workers: $count"
+}
+
+# Show recent events
+cmd_events() {
+    local issue_filter="${1:-}"
+    init_db
+
+    echo "Recent Events:"
+    echo "-------------------------------------------------------------------------------"
+
+    local query
+    if [[ -n "$issue_filter" ]]; then
+        query="
+            SELECT w.repo_name, w.issue_number, e.event_type, e.message, e.created_at
+            FROM events e
+            JOIN workers w ON e.worker_id = w.id
+            WHERE w.issue_number = $issue_filter
+            ORDER BY e.created_at DESC
+            LIMIT 50;
+        "
+    else
+        query="
+            SELECT w.repo_name, w.issue_number, e.event_type, e.message, e.created_at
+            FROM events e
+            JOIN workers w ON e.worker_id = w.id
+            ORDER BY e.created_at DESC
+            LIMIT 50;
+        "
+    fi
+
+    sqlite3 -separator '|' "$DB_PATH" "$query" | while IFS='|' read -r repo_name issue event_type message created_at; do
+        local display_issue="${issue:-feature}"
+        echo "[${repo_name} #${display_issue}] ${event_type}: ${message} (${created_at})"
+    done
+}
+
+# Stream logs for a specific worker
+cmd_logs() {
+    local issue_number="$1"
+
+    if [[ -z "$issue_number" ]]; then
+        echo "Error: --logs requires an issue number"
+        exit 1
+    fi
+
+    init_db
+
+    # Find the worktree path for this issue
+    local worktree_path
+    worktree_path=$(sqlite3 "$DB_PATH" "SELECT worktree_path FROM workers WHERE issue_number=$issue_number AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")
+
+    if [[ -z "$worktree_path" ]]; then
+        echo "Error: No active worker found for issue #$issue_number"
+        exit 1
+    fi
+
+    # Claude Code stores conversation logs in ~/.claude/
+    # For now, we'll show the events as a log stream
+    echo "Events for issue #$issue_number:"
+    echo "Worktree: $worktree_path"
+    echo "-------------------------------------------------------------------------------"
+
+    sqlite3 -separator '|' "$DB_PATH" "
+        SELECT e.event_type, e.message, e.created_at
+        FROM events e
+        JOIN workers w ON e.worker_id = w.id
+        WHERE w.issue_number = $issue_number
+        ORDER BY e.created_at ASC;
+    " | while IFS='|' read -r event_type message created_at; do
+        echo "[${created_at}] ${event_type}: ${message}"
+    done
+
+    # Also show current status
+    echo "-------------------------------------------------------------------------------"
+    local status phase pid
+    read -r status phase pid <<< "$(sqlite3 -separator ' ' "$DB_PATH" "SELECT status, phase, pid FROM workers WHERE issue_number=$issue_number AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")"
+    echo "Current status: $status | Phase: $phase | PID: $pid"
+}
+
+# Stop a specific worker
+cmd_stop() {
+    local issue_number="$1"
+
+    if [[ -z "$issue_number" ]]; then
+        echo "Error: --stop requires an issue number"
+        exit 1
+    fi
+
+    init_db
+
+    # Find the worker
+    local worker_info
+    worker_info=$(sqlite3 -separator '|' "$DB_PATH" "SELECT id, pid, repo_name FROM workers WHERE issue_number=$issue_number AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")
+
+    if [[ -z "$worker_info" ]]; then
+        echo "Error: No active worker found for issue #$issue_number"
+        exit 1
+    fi
+
+    IFS='|' read -r worker_id pid repo_name <<< "$worker_info"
+
+    echo "Stopping worker for issue #$issue_number (repo: $repo_name, PID: $pid)..."
+
+    # Send SIGTERM first, then SIGKILL if needed
+    if kill -TERM "$pid" 2>/dev/null; then
+        sleep 2
+        if is_worker_alive "$pid"; then
+            echo "Worker still running, sending SIGKILL..."
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+        db_update_status "$worker_id" "failed"
+        db_log_event "$worker_id" "stopped" "Manually stopped by user"
+        echo "Worker stopped."
+    else
+        echo "Process $pid is not running. Marking as failed."
+        db_update_status "$worker_id" "failed"
+        db_log_event "$worker_id" "cleanup" "Process not found when attempting to stop"
+    fi
+}
+
+# ============================================================================
+# Terminal Detection and Spawning
+# ============================================================================
 
 # Find Windows Terminal executable in WSL
 find_wt_exe() {
@@ -439,6 +769,20 @@ Once CI passes and there are no blocking reviews:
 
 **If no follow-up issues are needed, explicitly confirm:** "Reviewed for follow-up issues: none identified."
 
+### Phase 6: Completion Summary (REQUIRED)
+Before exiting, write a completion summary to help with future reference:
+
+\`\`\`bash
+# Update worker status to done and record completion summary
+sqlite3 "\${WORK_DB_PATH:-\${HOME}/.worktrees/work-sessions.db}" "UPDATE workers SET status='done', updated_at=CURRENT_TIMESTAMP WHERE id=\${WORK_WORKER_ID:-0};"
+\`\`\`
+
+Then output a summary including:
+- **What was accomplished**: Brief description of the completed work
+- **Files changed**: List of key files modified
+- **Key decisions made**: Any architectural or implementation choices
+- **Follow-up issues created**: Links to any issues created for future work
+
 ## Guidelines
 - Be thorough but avoid over-engineering
 - Write clear commit messages explaining the "why"
@@ -475,7 +819,20 @@ EOF
         exit 0
     fi
 
+    # Register worker in database
+    local repo_name
+    repo_name=$(basename "$REPO_ROOT")
+    local worker_id
+    worker_id=$(db_register_worker "$REPO_ROOT" "$repo_name" "$ISSUE_NUMBER" "$BRANCH_NAME" "$WORKTREE_PATH" "$$")
+    db_log_event "$worker_id" "started" "Worker started for ${task_ref}"
+    db_update_status "$worker_id" "running" "implementation"
+
+    # Export worker ID for potential use by hooks or child processes
+    export WORK_WORKER_ID="$worker_id"
+    export WORK_DB_PATH="$DB_PATH"
+
     echo "Starting Claude Code session..."
+    echo "  Worker ID: $worker_id"
 
     cd "$WORKTREE_PATH"
     exec claude --dangerously-skip-permissions "$prompt"
@@ -490,6 +847,21 @@ main() {
     case "$1" in
         --help|-h)
             usage
+            ;;
+        --status)
+            cmd_status
+            ;;
+        --events)
+            shift
+            cmd_events "$@"
+            ;;
+        --logs)
+            shift
+            cmd_logs "$1"
+            ;;
+        --stop)
+            shift
+            cmd_stop "$1"
             ;;
         --here)
             # Run in current terminal

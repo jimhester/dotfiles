@@ -5,7 +5,7 @@ description: Start Claude Code sessions for GitHub issues using git worktrees. U
 
 # Work Script
 
-The `work` script creates isolated Claude Code sessions for GitHub issues using git worktrees.
+The `work` script creates isolated Claude Code sessions for GitHub issues using git worktrees, with SQLite-based worker monitoring for managing multiple parallel sessions.
 
 ## Usage
 
@@ -22,18 +22,53 @@ work --here 42 "fix memory leak"
 work "add dark mode support"
 ```
 
+## Worker Management
+
+Monitor and control spawned workers from a parent session:
+
+```bash
+# Show all active workers across repos
+work --status
+# repo_name          | issue | status   | phase          | mins_idle
+# hawkins-dash       | 12    | running  | implementation | 2
+# dotfiles           | 45    | ci_wait  | ci_review      | 8
+
+# Show recent events (optionally filtered by issue)
+work --events
+work --events 42
+
+# View events for a specific worker
+work --logs 42
+
+# Stop a specific worker
+work --stop 42
+```
+
 ## What it does
 
 1. Parses GitHub issue/PR URLs or numbers
 2. Fetches issue title from GitHub for branch naming
 3. Creates or reuses a git worktree with branch `issue-{num}-{slug}`
-4. Starts Claude Code with a structured prompt for end-to-end completion
+4. Registers worker in SQLite database for monitoring
+5. Starts Claude Code with a structured prompt for end-to-end completion
+6. Tracks worker status (starting, running, pr_open, ci_waiting, done, failed)
+
+## Database
+
+Worker state is stored in `~/.worktrees/work-sessions.db` with three tables:
+- `workers` - Active worker metadata (repo, issue, branch, PID, status, phase)
+- `events` - History of status changes and events
+- `completions` - Final summaries when workers complete
 
 ## Environment variables
 
 - `MAIN_BRANCH` - Base branch for new branches (default: main)
-- `WORKTREE_BASE` - Directory for worktrees (default: ../worktrees)
+- `WORKTREE_BASE` - Directory for worktrees (default: ~/.worktrees)
 - `SPAWN_DELAY` - Delay between tab spawns (default: 0.5s)
+
+Workers also export these variables for use by Claude Code:
+- `WORK_WORKER_ID` - Database ID of the current worker
+- `WORK_DB_PATH` - Path to the SQLite database
 
 ## When to suggest this script
 
@@ -41,6 +76,8 @@ If the user wants to:
 - Start working on a different GitHub issue
 - Work on multiple issues in parallel
 - Create an isolated environment for a task
+- Monitor status of running workers
+- Stop a runaway worker process
 
 Suggest they exit the current session and run `work <issue>` from their terminal.
 
