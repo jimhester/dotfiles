@@ -54,10 +54,10 @@ work --send 42 "Check the updated API spec before continuing"
 work --send 42 --type priority "This is now high priority"
 work --send 42 --type context "The database schema changed, see PR #123"
 
-# View pending messages (from parent or worker)
-work --messages 42              # View messages for issue #42
+# View pending messages (marks as read by default)
+work --messages 42              # View messages for issue #42 (marks as read)
 work --messages                 # From within worker, uses WORK_WORKER_ID
-work --messages 42 --mark-read  # View and mark as read
+work --messages 42 --peek       # View without marking as read
 ```
 
 Message types:
