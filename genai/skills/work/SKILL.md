@@ -47,6 +47,25 @@ work --logs 42
 work --stop 42
 ```
 
+### Issue Argument Syntax
+
+All worker management commands support flexible issue lookups:
+
+```bash
+# By issue number (defaults to current repo)
+work --stop 42
+work --logs 42
+
+# By PR number (searches both issue_number and pr_number)
+work --logs 47                  # Finds worker by its PR number
+
+# Explicit repo (for cross-repo management)
+work --stop hawkins-dash:42     # Stop issue 42 in hawkins-dash repo
+work --send myrepo:50 "message" # Send message to worker in different repo
+```
+
+This is useful when managing workers across multiple repositories simultaneously.
+
 ## Stage Tracking
 
 Workers report their current stage for better visibility. Stages are:
@@ -97,7 +116,7 @@ Message types:
 
 1. Parses GitHub issue/PR URLs or numbers
 2. Fetches issue title from GitHub for branch naming
-3. Creates or reuses a git worktree with branch `issue-{num}-{slug}`
+3. Creates or reuses a git worktree at `~/.worktrees/{repo}/{branch}` (repo-isolated)
 4. Registers worker in SQLite database for monitoring
 5. Starts Claude Code with a structured prompt for end-to-end completion
 6. Tracks worker status and stage for visibility into workflow progress
@@ -134,45 +153,27 @@ The hook script (`~/.claude/hooks/work-stage-detector.sh`):
 
 This eliminates manual stage reporting, ensuring accurate workflow progression tracking.
 
-## Auto-Detection Hooks
-
-When installed, Claude Code hooks automatically detect workflow events and update worker status:
-
-| Event | Resulting Status | Phase |
-|-------|-----------------|-------|
-| `gh pr create` | `ci_waiting` | `ci_review` |
-| CI passes (`gh pr checks`) | `review_waiting` | `review` |
-| `gh pr merge` | `merged` | `follow_up` |
-| Merge/rebase conflicts | `merge_conflicts` | `blocked` |
-| Conflict resolved | `running` | `implementation` |
-
-### Installing Hooks
-
-```bash
-# Run the installer from your dotfiles repo
-./genai/hooks/install-hooks.sh
-```
-
-This installs a PostToolUse hook that monitors Bash commands and automatically updates the worker database.
-
-### How It Works
-
-The hook script (`~/.claude/hooks/work-stage-detector.sh`):
-1. Runs after every Bash tool call
-2. Parses the command and output from the hook input
-3. Detects workflow events (PR creation, CI checks, merges, conflicts)
-4. Updates the worker's status/phase in the SQLite database
-5. Logs events for tracking via `work --events`
-
-This eliminates manual stage reporting, ensuring accurate workflow progression tracking.
-
 ## Database
 
 Worker state is stored in `~/.worktrees/work-sessions.db` with four tables:
-- `workers` - Active worker metadata (repo, issue, branch, PID, status, stage)
+- `workers` - Active worker metadata (repo, issue, branch, PID, status, stage, pr_number)
 - `events` - History of status changes, stage transitions, and events
 - `completions` - Final summaries when workers complete
 - `messages` - Parent-to-worker message queue
+
+## Directory Structure
+
+Worktrees are organized by repository to prevent issue number collisions:
+
+```
+~/.worktrees/
+├── work-sessions.db          # Shared SQLite database
+├── hawkins-dash/
+│   ├── issue-42-fix-auth/
+│   └── issue-99-add-metrics/
+└── dotfiles/
+    └── issue-15-work-hooks/
+```
 
 ## Environment variables
 
