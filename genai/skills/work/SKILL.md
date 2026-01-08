@@ -134,6 +134,38 @@ The hook script (`~/.claude/hooks/work-stage-detector.sh`):
 
 This eliminates manual stage reporting, ensuring accurate workflow progression tracking.
 
+## Auto-Detection Hooks
+
+When installed, Claude Code hooks automatically detect workflow events and update worker status:
+
+| Event | Resulting Status | Phase |
+|-------|-----------------|-------|
+| `gh pr create` | `ci_waiting` | `ci_review` |
+| CI passes (`gh pr checks`) | `review_waiting` | `review` |
+| `gh pr merge` | `merged` | `follow_up` |
+| Merge/rebase conflicts | `merge_conflicts` | `blocked` |
+| Conflict resolved | `running` | `implementation` |
+
+### Installing Hooks
+
+```bash
+# Run the installer from your dotfiles repo
+./genai/hooks/install-hooks.sh
+```
+
+This installs a PostToolUse hook that monitors Bash commands and automatically updates the worker database.
+
+### How It Works
+
+The hook script (`~/.claude/hooks/work-stage-detector.sh`):
+1. Runs after every Bash tool call
+2. Parses the command and output from the hook input
+3. Detects workflow events (PR creation, CI checks, merges, conflicts)
+4. Updates the worker's status/phase in the SQLite database
+5. Logs events for tracking via `work --events`
+
+This eliminates manual stage reporting, ensuring accurate workflow progression tracking.
+
 ## Database
 
 Worker state is stored in `~/.worktrees/work-sessions.db` with four tables:
