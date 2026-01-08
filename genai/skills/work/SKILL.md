@@ -1,9 +1,11 @@
 ---
 name: work
-description: Start Claude Code sessions for GitHub issues using git worktrees. Use when discussing the work script, starting new issue work, or managing multiple tasks in parallel.
+description: REQUIRED for starting work on GitHub issues. When user says "work on issue X", "start issue X", "fix issue X", or similar - ALWAYS use this skill to spawn a dedicated worker session instead of working in the current session.
 ---
 
 # Work Script
+
+**IMPORTANT: When the user asks to work on, start, or fix a GitHub issue, USE THIS SKILL to spawn a dedicated worker. Do NOT work on the issue in the current session unless explicitly told to (e.g., "work on issue 42 here" or "in this session").**
 
 The `work` script creates isolated Claude Code sessions for GitHub issues using git worktrees, with SQLite-based worker monitoring for managing multiple parallel sessions.
 
@@ -93,17 +95,20 @@ Workers also export these variables for use by Claude Code:
 - `WORK_WORKER_ID` - Database ID of the current worker
 - `WORK_DB_PATH` - Path to the SQLite database
 
-## When to suggest this script
+## When to use this skill
 
-If the user wants to:
-- Start working on a different GitHub issue
-- Work on multiple issues in parallel
-- Create an isolated environment for a task
-- Monitor status of running workers
-- Stop a runaway worker process
-- Send messages/instructions to running workers
+**ALWAYS use this skill when the user:**
+- Says "work on issue X", "start issue X", "fix issue X", "implement issue X"
+- Wants to work on a GitHub issue (spawn a worker, don't work here)
+- Asks to work on multiple issues in parallel
+- Wants to check on running workers (`work --status`)
+- Needs to send messages to workers (`work --send`)
+- Wants to stop a worker (`work --stop`)
 
-Suggest they exit the current session and run `work <issue>` from their terminal.
+**DO NOT use this skill when:**
+- User explicitly says "work on it here" or "in this session"
+- User is asking about the work script itself (just answer the question)
+- User wants to see worker status (use `work --status` directly via Bash)
 
 ## Note
 
