@@ -912,6 +912,23 @@ run_here() {
 
     # Try to parse as issue reference
     if parse_issue_input "$input"; then
+        # Check for repo mismatch when a full URL was provided
+        if [[ -n "$ISSUE_REPO" ]] && [[ "$ISSUE_REPO" != "$repo_name" ]]; then
+            echo "Error: Repository mismatch detected!"
+            echo ""
+            echo "  Issue/PR is from:  ${ISSUE_OWNER}/${ISSUE_REPO}"
+            echo "  Current repo:      ${repo_name}"
+            echo ""
+            echo "The worktree would be created from the wrong repository."
+            echo ""
+            echo "To fix this, run the work command from the correct repository:"
+            echo "  cd /path/to/${ISSUE_REPO} && work $input"
+            echo ""
+            echo "Or use just the issue number if you're in the correct repo:"
+            echo "  work ${ISSUE_NUMBER}"
+            exit 1
+        fi
+
         if [[ "$ISSUE_TYPE" == "pull" ]]; then
             echo "Found PR #${ISSUE_NUMBER}"
             if [[ -n "$ISSUE_OWNER" ]] && [[ -n "$ISSUE_REPO" ]]; then

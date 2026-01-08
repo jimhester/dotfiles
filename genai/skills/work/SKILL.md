@@ -24,6 +24,28 @@ work --here 42 "fix memory leak"
 work "add dark mode support"
 ```
 
+## Cross-Repository Issues
+
+**IMPORTANT**: The `work` command must be run from within the repository that the issue belongs to. If you provide a full GitHub URL for an issue in a different repo than your current directory, the script will error with a helpful message.
+
+```bash
+# Example: You're in ~/projects/repo-a but the issue is in repo-b
+$ work https://github.com/owner/repo-b/issues/42
+Error: Repository mismatch detected!
+
+  Issue/PR is from:  owner/repo-b
+  Current repo:      repo-a
+
+The worktree would be created from the wrong repository.
+
+To fix this, run the work command from the correct repository:
+  cd /path/to/repo-b && work https://github.com/owner/repo-b/issues/42
+```
+
+When spawning workers for cross-repo issues:
+1. First `cd` to the correct repository directory
+2. Then run the `work` command
+
 ## Worker Management
 
 Monitor and control spawned workers from a parent session:
