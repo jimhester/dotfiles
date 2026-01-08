@@ -41,6 +41,7 @@ Worker Management:
   $(basename "$0") --send <issue> <message>    # Send message to worker
   $(basename "$0") --messages [issue]          # View and mark messages as read
   $(basename "$0") --messages [issue] --peek   # View without marking as read
+  $(basename "$0") --stage <stage>             # Set current worker stage (from within worker)
 
 Options:
   --here       Run in current terminal instead of spawning new tab
@@ -50,6 +51,7 @@ Options:
   --stop       Terminate a specific worker
   --send       Send a message to a worker (use --type <type> for custom types)
   --messages   View pending messages (marks as read by default; use --peek to keep unread)
+  --stage      Set worker stage (exploring, planning, implementing, testing, pr_creating, etc.)
   --help       Show this help message
 
 Environment:
@@ -78,6 +80,7 @@ CREATE TABLE IF NOT EXISTS workers (
     pid INTEGER,
     status TEXT DEFAULT 'starting',
     phase TEXT DEFAULT 'implementation',
+    stage TEXT DEFAULT 'exploring',
     pr_number INTEGER,
     pr_url TEXT,
     started_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -138,8 +141,8 @@ db_register_worker() {
 
     # Use INSERT OR REPLACE to handle re-runs on the same branch
     sqlite3 "$DB_PATH" <<SQL
-INSERT OR REPLACE INTO workers (repo_path, repo_name, issue_number, branch, worktree_path, pid, status, phase, started_at, updated_at)
-VALUES ('$repo_path', '$repo_name', ${issue_number:-NULL}, '$branch', '$worktree_path', $pid, 'starting', 'implementation', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT OR REPLACE INTO workers (repo_path, repo_name, issue_number, branch, worktree_path, pid, status, phase, stage, started_at, updated_at)
+VALUES ('$repo_path', '$repo_name', ${issue_number:-NULL}, '$branch', '$worktree_path', $pid, 'starting', 'implementation', 'exploring', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 SQL
 
     # Return the worker ID
@@ -157,6 +160,25 @@ db_update_status() {
     else
         sqlite3 "$DB_PATH" "UPDATE workers SET status='$status', updated_at=CURRENT_TIMESTAMP WHERE id=$worker_id;"
     fi
+}
+
+# Update worker stage (granular progress tracking)
+# Valid stages: exploring, planning, implementing, testing, pr_creating,
+#               ci_waiting, review_waiting, review_responding, merge_conflicts, done, blocked
+db_update_stage() {
+    local worker_id="$1"
+    local stage="$2"
+
+    # Validate stage
+    local valid_stages="exploring planning implementing testing pr_creating ci_waiting review_waiting review_responding merge_conflicts done blocked"
+    if ! echo "$valid_stages" | grep -qw "$stage"; then
+        echo "Error: Invalid stage '$stage'"
+        echo "Valid stages: $valid_stages"
+        return 1
+    fi
+
+    sqlite3 "$DB_PATH" "UPDATE workers SET stage='$stage', updated_at=CURRENT_TIMESTAMP WHERE id=$worker_id;"
+    db_log_event "$worker_id" "stage_change" "Stage changed to: $stage"
 }
 
 # Update worker with PR information
@@ -291,17 +313,17 @@ cmd_status() {
 
     echo "Active Workers:"
     echo "-------------------------------------------------------------------------------"
-    printf "%-20s | %-6s | %-10s | %-14s | %s\n" "repo_name" "issue" "status" "phase" "mins_idle"
+    printf "%-20s | %-6s | %-17s | %s\n" "repo_name" "issue" "stage" "mins_idle"
     echo "-------------------------------------------------------------------------------"
 
     sqlite3 -separator '|' "$DB_PATH" "
-        SELECT repo_name, COALESCE(issue_number, '-'), status, phase,
+        SELECT repo_name, COALESCE(issue_number, '-'), COALESCE(stage, phase),
                CAST((julianday('now') - julianday(updated_at)) * 24 * 60 AS INTEGER)
         FROM workers
         WHERE status NOT IN ('done', 'failed')
         ORDER BY updated_at DESC;
-    " | while IFS='|' read -r repo_name issue status phase mins_idle; do
-        printf "%-20s | %-6s | %-10s | %-14s | %s\n" "$repo_name" "$issue" "$status" "$phase" "$mins_idle"
+    " | while IFS='|' read -r repo_name issue stage mins_idle; do
+        printf "%-20s | %-6s | %-17s | %s\n" "$repo_name" "$issue" "$stage" "$mins_idle"
     done
 
     local count
@@ -382,9 +404,9 @@ cmd_logs() {
 
     # Also show current status
     echo "-------------------------------------------------------------------------------"
-    local status phase pid
-    read -r status phase pid <<< "$(sqlite3 -separator ' ' "$DB_PATH" "SELECT status, phase, pid FROM workers WHERE issue_number=$issue_number AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")"
-    echo "Current status: $status | Phase: $phase | PID: $pid"
+    local status stage pid
+    read -r status stage pid <<< "$(sqlite3 -separator ' ' "$DB_PATH" "SELECT status, COALESCE(stage, phase), pid FROM workers WHERE issue_number=$issue_number AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")"
+    echo "Current status: $status | Stage: $stage | PID: $pid"
 }
 
 # Stop a specific worker
@@ -521,6 +543,56 @@ cmd_messages() {
         echo "All messages marked as read."
     else
         echo "(Peek mode - messages NOT marked as read)"
+    fi
+}
+
+# Set worker stage (from within a worker session)
+cmd_stage() {
+    local stage="${1:-}"
+
+    if [[ -z "$stage" ]]; then
+        echo "Error: --stage requires a stage name"
+        echo "Usage: work --stage <stage>"
+        echo ""
+        echo "Valid stages:"
+        echo "  exploring        - Reading issue, understanding codebase"
+        echo "  planning         - Designing approach, creating todo list"
+        echo "  implementing     - Writing code"
+        echo "  testing          - Running local tests"
+        echo "  pr_creating      - Creating PR, writing description"
+        echo "  ci_waiting       - PR created, waiting for CI to pass"
+        echo "  review_waiting   - CI passed, waiting for review"
+        echo "  review_responding - Addressing review feedback"
+        echo "  merge_conflicts  - Resolving merge conflicts"
+        echo "  done             - PR merged or issue closed"
+        echo "  blocked          - Waiting on external dependency"
+        exit 1
+    fi
+
+    init_db
+
+    # Get worker ID from environment or try to find by current branch
+    local worker_id=""
+    if [[ -n "${WORK_WORKER_ID:-}" ]]; then
+        worker_id="$WORK_WORKER_ID"
+    else
+        # Try to find by current branch
+        local current_branch
+        current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+        if [[ -n "$current_branch" ]]; then
+            worker_id=$(db_get_worker_by_branch "$current_branch")
+        fi
+    fi
+
+    if [[ -z "$worker_id" ]]; then
+        echo "Error: Could not determine worker ID"
+        echo "This command should be run from within a worker session"
+        echo "(WORK_WORKER_ID environment variable not set and no active worker for current branch)"
+        exit 1
+    fi
+
+    if db_update_stage "$worker_id" "$stage"; then
+        echo "Stage updated to: $stage"
     fi
 }
 
@@ -1029,6 +1101,10 @@ main() {
         --messages)
             shift
             cmd_messages "$@"
+            ;;
+        --stage)
+            shift
+            cmd_stage "$@"
             ;;
         --here)
             # Run in current terminal

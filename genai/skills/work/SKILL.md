@@ -31,9 +31,10 @@ Monitor and control spawned workers from a parent session:
 ```bash
 # Show all active workers across repos
 work --status
-# repo_name          | issue | status   | phase          | mins_idle
-# hawkins-dash       | 12    | running  | implementation | 2
-# dotfiles           | 45    | ci_wait  | ci_review      | 8
+# repo_name          | issue | stage             | mins_idle
+# hawkins-dash       | 12    | implementing      | 2
+# dotfiles           | 45    | pr_creating       | 8
+# another-repo       | 23    | ci_waiting        | 15
 
 # Show recent events (optionally filtered by issue)
 work --events
@@ -45,6 +46,27 @@ work --logs 42
 # Stop a specific worker
 work --stop 42
 ```
+
+## Stage Tracking
+
+Workers can report their current stage for better visibility:
+
+```bash
+# From within a worker session, update the current stage
+work --stage exploring        # Reading issue, understanding codebase
+work --stage planning         # Designing approach, creating todo list
+work --stage implementing     # Writing code
+work --stage testing          # Running local tests
+work --stage pr_creating      # Creating PR, writing description
+work --stage ci_waiting       # PR created, waiting for CI to pass
+work --stage review_waiting   # CI passed, waiting for review
+work --stage review_responding # Addressing review feedback
+work --stage merge_conflicts  # Resolving merge conflicts
+work --stage done             # PR merged or issue closed
+work --stage blocked          # Waiting on external dependency
+```
+
+Stage transitions are logged as events and visible in `work --status`.
 
 ## Parent-to-Worker Messaging
 
@@ -75,13 +97,13 @@ Message types:
 3. Creates or reuses a git worktree with branch `issue-{num}-{slug}`
 4. Registers worker in SQLite database for monitoring
 5. Starts Claude Code with a structured prompt for end-to-end completion
-6. Tracks worker status (starting, running, pr_open, ci_waiting, done, failed)
+6. Tracks worker stage (exploring, implementing, pr_creating, ci_waiting, etc.)
 
 ## Database
 
 Worker state is stored in `~/.worktrees/work-sessions.db` with four tables:
-- `workers` - Active worker metadata (repo, issue, branch, PID, status, phase)
-- `events` - History of status changes and events
+- `workers` - Active worker metadata (repo, issue, branch, PID, status, stage)
+- `events` - History of status changes, stage transitions, and events
 - `completions` - Final summaries when workers complete
 - `messages` - Parent-to-worker message queue
 
