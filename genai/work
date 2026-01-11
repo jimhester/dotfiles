@@ -42,6 +42,10 @@ Worker Management:
   $(basename "$0") --messages [issue]          # View and mark messages as read
   $(basename "$0") --messages [issue] --peek   # View without marking as read
   $(basename "$0") --stage <stage> [issue]     # Set worker stage (for progress tracking)
+  $(basename "$0") --done [issue]              # Mark worker as done
+  $(basename "$0") --pr <number> <url> [issue] # Register PR for worker
+  $(basename "$0") --event <type> <msg> [issue] # Log an event
+  $(basename "$0") --transition <status> <phase> <stage> [event] [msg] [issue]
 
   Issue arguments support:
     - Issue number: 42 (defaults to current repo)
@@ -58,6 +62,10 @@ Options:
   --messages   View pending messages (marks as read by default; use --peek to keep unread)
   --stage      Set worker stage (exploring, planning, implementing, testing, pr_creating,
                ci_waiting, review_waiting, review_responding, merge_conflicts, done, blocked)
+  --done       Mark worker as done (sets both status and stage)
+  --pr         Register PR number and URL for worker
+  --event      Log an event for a worker
+  --transition Set status, phase, and stage with optional event logging
   --help       Show this help message
 
 Environment:
@@ -661,6 +669,150 @@ cmd_stage() {
     fi
 }
 
+# Mark worker as done (sets both status and stage)
+cmd_done() {
+    local issue_arg="${1:-}"
+
+    init_db
+
+    # Find the worker ID
+    local worker_id=""
+    if [[ -n "$issue_arg" ]]; then
+        parse_issue_arg "$issue_arg"
+        worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
+        if [[ -z "$worker_id" ]]; then
+            echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
+            exit 1
+        fi
+    elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
+        worker_id="$WORK_WORKER_ID"
+    else
+        echo "Error: --done requires an issue number (or repo:issue) or must be run from within a worker session"
+        echo "Usage: work --done [issue]"
+        echo "       work --done [repo:issue]"
+        exit 1
+    fi
+
+    db_update_status "$worker_id" "done"
+    db_update_stage "$worker_id" "done"
+    db_log_event "$worker_id" "completed" "Worker marked as done"
+    echo "Worker marked as done"
+}
+
+# Update PR info for a worker
+cmd_pr() {
+    local pr_number="${1:-}"
+    local pr_url="${2:-}"
+    local issue_arg="${3:-}"
+
+    if [[ -z "$pr_number" ]] || [[ -z "$pr_url" ]]; then
+        echo "Error: --pr requires PR number and URL"
+        echo "Usage: work --pr <number> <url> [issue]"
+        exit 1
+    fi
+
+    init_db
+
+    # Find the worker ID
+    local worker_id=""
+    if [[ -n "$issue_arg" ]]; then
+        parse_issue_arg "$issue_arg"
+        worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
+        if [[ -z "$worker_id" ]]; then
+            echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
+            exit 1
+        fi
+    elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
+        worker_id="$WORK_WORKER_ID"
+    else
+        echo "Error: --pr must be run from within a worker session or specify an issue"
+        echo "Usage: work --pr <number> <url> [issue]"
+        exit 1
+    fi
+
+    db_update_pr "$worker_id" "$pr_number" "$pr_url"
+    db_update_stage "$worker_id" "ci_waiting"
+    db_log_event "$worker_id" "pr_created" "PR #$pr_number created"
+    echo "PR #$pr_number registered"
+}
+
+# Log an event for a worker
+cmd_event() {
+    local event_type="${1:-}"
+    local message="${2:-}"
+    local issue_arg="${3:-}"
+
+    if [[ -z "$event_type" ]] || [[ -z "$message" ]]; then
+        echo "Error: --event requires event type and message"
+        echo "Usage: work --event <type> <message> [issue]"
+        exit 1
+    fi
+
+    init_db
+
+    # Find the worker ID
+    local worker_id=""
+    if [[ -n "$issue_arg" ]]; then
+        parse_issue_arg "$issue_arg"
+        worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
+        if [[ -z "$worker_id" ]]; then
+            echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
+            exit 1
+        fi
+    elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
+        worker_id="$WORK_WORKER_ID"
+    else
+        echo "Error: --event must be run from within a worker session or specify an issue"
+        echo "Usage: work --event <type> <message> [issue]"
+        exit 1
+    fi
+
+    db_log_event "$worker_id" "$event_type" "$message"
+    echo "Event logged: $event_type"
+}
+
+# Transition worker state (status, phase, stage) with optional event
+cmd_transition() {
+    local status="${1:-}"
+    local phase="${2:-}"
+    local stage="${3:-}"
+    local event_type="${4:-}"
+    local message="${5:-}"
+    local issue_arg="${6:-}"
+
+    if [[ -z "$status" ]] || [[ -z "$phase" ]] || [[ -z "$stage" ]]; then
+        echo "Error: --transition requires status, phase, and stage"
+        echo "Usage: work --transition <status> <phase> <stage> [event_type] [message] [issue]"
+        exit 1
+    fi
+
+    init_db
+
+    # Find the worker ID
+    local worker_id=""
+    if [[ -n "$issue_arg" ]]; then
+        parse_issue_arg "$issue_arg"
+        worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
+        if [[ -z "$worker_id" ]]; then
+            echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
+            exit 1
+        fi
+    elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
+        worker_id="$WORK_WORKER_ID"
+    else
+        echo "Error: --transition must be run from within a worker session or specify an issue"
+        echo "Usage: work --transition <status> <phase> <stage> [event_type] [message] [issue]"
+        exit 1
+    fi
+
+    db_update_status "$worker_id" "$status" "$phase"
+    db_update_stage "$worker_id" "$stage"
+    if [[ -n "$event_type" ]] && [[ -n "$message" ]]; then
+        db_log_event "$worker_id" "$event_type" "$message"
+    fi
+    echo "Transitioned to: status=$status phase=$phase stage=$stage"
+}
+
 # ============================================================================
 # Terminal Detection and Spawning
 # ============================================================================
@@ -1085,8 +1237,8 @@ Once CI passes and there are no blocking reviews:
 Before exiting, write a completion summary to help with future reference:
 
 \`\`\`bash
-# Update worker status to done and record completion summary
-sqlite3 "\${WORK_DB_PATH:-\${HOME}/.worktrees/work-sessions.db}" "UPDATE workers SET status='done', updated_at=CURRENT_TIMESTAMP WHERE id=\${WORK_WORKER_ID:-0};"
+# Mark worker as done
+work --done
 \`\`\`
 
 Then output a summary including:
@@ -1189,6 +1341,22 @@ main() {
         --stage)
             shift
             cmd_stage "$@"
+            ;;
+        --done)
+            shift
+            cmd_done "$@"
+            ;;
+        --pr)
+            shift
+            cmd_pr "$@"
+            ;;
+        --event)
+            shift
+            cmd_event "$@"
+            ;;
+        --transition)
+            shift
+            cmd_transition "$@"
             ;;
         --here)
             # Run in current terminal
