@@ -1,89 +1,72 @@
-#!/bin/bash
-set -euo pipefail
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "click>=8.0",
+# ]
+# ///
+"""
+work - Start Claude Code session(s) for GitHub issue(s) or JIRA tickets.
 
-# work - Start Claude Code session(s) for GitHub issue(s)
-#
-# By default, spawns each issue in a new terminal tab:
-#   - macOS: Uses iTerm2
-#   - WSL: Uses Windows Terminal
-# Use --here to run in the current terminal instead.
-#
-# Usage: ./work <issue> [issue2 ...]      # Each in new tab (default)
-#        ./work --here <issue>            # Run in current terminal
-#        ./work "feature description"    # New feature branch
+By default, spawns each issue in a new terminal tab:
+  - macOS: Uses iTerm2
+  - WSL: Uses Windows Terminal
+Use --here to run in the current terminal instead.
+"""
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-WORKTREE_BASE="${WORKTREE_BASE:-${HOME}/.worktrees}"
-MAIN_BRANCH="${MAIN_BRANCH:-main}"
-SPAWN_DELAY="${SPAWN_DELAY:-0.5}"
-DB_PATH="${WORKTREE_BASE}/work-sessions.db"
+from __future__ import annotations
 
-usage() {
-    cat <<EOF
-Usage: $(basename "$0") <issue> [issue2 ...]
-       $(basename "$0") --here <issue-url-or-number> [description]
-       $(basename "$0") "description of new feature"
+import os
+import re
+import json
+import signal
+import sqlite3
+import subprocess
+import sys
+import time
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, Iterator
 
-By default, spawns each issue in a new terminal tab (macOS iTerm2 or WSL Windows Terminal).
+import click
 
-Examples:
-  $(basename "$0") 97 98 99                    # Spawn 3 issues in new tabs
-  $(basename "$0") https://github.com/owner/repo/issues/42
-  $(basename "$0") --here 42 "fix memory leak"  # Run in current terminal
-  $(basename "$0") "add dark mode support"      # New feature branch
+# =============================================================================
+# Configuration
+# =============================================================================
 
-Worker Management:
-  $(basename "$0") --status                    # Show all active workers
-  $(basename "$0") --events [issue]            # Show recent events (optionally filtered)
-  $(basename "$0") --logs <issue>              # Stream worker output
-  $(basename "$0") --stop <issue>              # Signal worker to stop
-  $(basename "$0") --send <issue> <message>    # Send message to worker
-  $(basename "$0") --messages [issue]          # View and mark messages as read
-  $(basename "$0") --messages [issue] --peek   # View without marking as read
-  $(basename "$0") --stage <stage> [issue]     # Set worker stage (for progress tracking)
-  $(basename "$0") --done [issue]              # Mark worker as done
-  $(basename "$0") --pr <number> <url> [issue] # Register PR for worker
-  $(basename "$0") --event <type> <msg> [issue] # Log an event
-  $(basename "$0") --transition <status> <phase> <stage> [event] [msg] [issue]
+@dataclass
+class Config:
+    """Application configuration from environment variables."""
+    worktree_base: Path = field(default_factory=lambda: Path.home() / ".worktrees")
+    main_branch: str = "main"
+    spawn_delay: float = 0.5
 
-  Issue arguments support:
-    - Issue number: 42 (defaults to current repo)
-    - PR number: 47 (searches both issue_number and pr_number)
-    - Explicit repo: myrepo:42 (for cross-repo lookups)
+    def __post_init__(self):
+        self.worktree_base = Path(os.environ.get("WORKTREE_BASE", self.worktree_base))
+        self.main_branch = os.environ.get("MAIN_BRANCH", self.main_branch)
+        self.spawn_delay = float(os.environ.get("SPAWN_DELAY", self.spawn_delay))
 
-Options:
-  --here       Run in current terminal instead of spawning new tab
-  --status     Show status of all active workers across repos
-  --events     Show recent worker events
-  --logs       Tail logs for a specific worker
-  --stop       Terminate a specific worker
-  --send       Send a message to a worker (use --type <type> for custom types)
-  --messages   View pending messages (marks as read by default; use --peek to keep unread)
-  --stage      Set worker stage (exploring, planning, implementing, testing, pr_creating,
-               ci_waiting, review_waiting, review_responding, merge_conflicts, done, blocked)
-  --done       Mark worker as done (sets both status and stage)
-  --pr         Register PR number and URL for worker
-  --event      Log an event for a worker
-  --transition Set status, phase, and stage with optional event logging
-  --help       Show this help message
+    @property
+    def db_path(self) -> Path:
+        return self.worktree_base / "work-sessions.db"
 
-Environment:
-  MAIN_BRANCH    Base branch for new branches (default: main)
-  WORKTREE_BASE  Directory for worktrees (default: ~/.worktrees)
-  SPAWN_DELAY    Delay between spawns in seconds (default: 0.5)
-EOF
-    exit 1
-}
 
-# ============================================================================
-# SQLite Database Functions
-# ============================================================================
+config = Config()
 
-# Initialize the SQLite database with required tables
-init_db() {
-    mkdir -p "$(dirname "$DB_PATH")"
-    sqlite3 "$DB_PATH" <<'SQL'
+# Valid stages for worker progress tracking
+VALID_STAGES = [
+    "exploring", "planning", "implementing", "testing", "pr_creating",
+    "ci_waiting", "review_waiting", "review_responding", "merge_conflicts",
+    "done", "blocked"
+]
+
+# =============================================================================
+# Database Layer
+# =============================================================================
+
+SCHEMA = """
 CREATE TABLE IF NOT EXISTS workers (
     id INTEGER PRIMARY KEY,
     repo_path TEXT,
@@ -97,6 +80,8 @@ CREATE TABLE IF NOT EXISTS workers (
     stage TEXT DEFAULT 'exploring',
     pr_number INTEGER,
     pr_url TEXT,
+    jira_key TEXT,
+    issue_source TEXT DEFAULT 'github',
     started_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(repo_path, branch)
@@ -138,1077 +123,590 @@ CREATE INDEX IF NOT EXISTS idx_events_worker ON events(worker_id);
 CREATE INDEX IF NOT EXISTS idx_events_time ON events(created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_worker ON messages(worker_id);
 CREATE INDEX IF NOT EXISTS idx_messages_unread ON messages(worker_id, read_at);
-SQL
-
-    # Migration: add stage column if it doesn't exist (for existing databases)
-    local has_stage
-    has_stage=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM pragma_table_info('workers') WHERE name='stage';")
-    if [[ "$has_stage" -eq 0 ]]; then
-        sqlite3 "$DB_PATH" "ALTER TABLE workers ADD COLUMN stage TEXT DEFAULT 'exploring';"
-    fi
-}
-
-# Register a new worker in the database
-# Returns the worker ID
-db_register_worker() {
-    local repo_path="$1"
-    local repo_name="$2"
-    local issue_number="$3"
-    local branch="$4"
-    local worktree_path="$5"
-    local pid="$6"
-
-    init_db
-
-    # Use INSERT OR REPLACE to handle re-runs on the same branch
-    sqlite3 "$DB_PATH" <<SQL
-INSERT OR REPLACE INTO workers (repo_path, repo_name, issue_number, branch, worktree_path, pid, status, phase, stage, started_at, updated_at)
-VALUES ('$repo_path', '$repo_name', ${issue_number:-NULL}, '$branch', '$worktree_path', $pid, 'starting', 'implementation', 'exploring', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-SQL
-
-    # Return the worker ID
-    sqlite3 "$DB_PATH" "SELECT id FROM workers WHERE repo_path='$repo_path' AND branch='$branch';"
-}
-
-# Update worker status
-db_update_status() {
-    local worker_id="$1"
-    local status="$2"
-    local phase="${3:-}"
-
-    if [[ -n "$phase" ]]; then
-        sqlite3 "$DB_PATH" "UPDATE workers SET status='$status', phase='$phase', updated_at=CURRENT_TIMESTAMP WHERE id=$worker_id;"
-    else
-        sqlite3 "$DB_PATH" "UPDATE workers SET status='$status', updated_at=CURRENT_TIMESTAMP WHERE id=$worker_id;"
-    fi
-}
-
-# Update worker stage (granular progress tracking)
-# Valid stages: exploring, planning, implementing, testing, pr_creating,
-#               ci_waiting, review_waiting, review_responding, merge_conflicts, done, blocked
-db_update_stage() {
-    local worker_id="$1"
-    local stage="$2"
-
-    # Validate stage
-    local valid_stages="exploring planning implementing testing pr_creating ci_waiting review_waiting review_responding merge_conflicts done blocked"
-    if ! echo "$valid_stages" | grep -qw "$stage"; then
-        echo "Error: Invalid stage '$stage'"
-        echo "Valid stages: $valid_stages"
-        return 1
-    fi
-
-    sqlite3 "$DB_PATH" "UPDATE workers SET stage='$stage', updated_at=CURRENT_TIMESTAMP WHERE id=$worker_id;"
-    db_log_event "$worker_id" "stage_change" "Stage changed to: $stage"
-}
-
-# Update worker with PR information
-db_update_pr() {
-    local worker_id="$1"
-    local pr_number="$2"
-    local pr_url="$3"
-
-    sqlite3 "$DB_PATH" "UPDATE workers SET pr_number=$pr_number, pr_url='$pr_url', status='pr_open', phase='ci_review', updated_at=CURRENT_TIMESTAMP WHERE id=$worker_id;"
-}
-
-# Log an event for a worker
-db_log_event() {
-    local worker_id="$1"
-    local event_type="$2"
-    local message="$3"
-
-    sqlite3 "$DB_PATH" "INSERT INTO events (worker_id, event_type, message) VALUES ($worker_id, '$event_type', '$message');"
-}
-
-# Store completion summary
-db_store_completion() {
-    local worker_id="$1"
-    local summary="$2"
-    local files_changed="$3"
-    local tests_added="$4"
-    local pr_url="$5"
-    local merged="$6"
-    local follow_up_issues="$7"
-    local lessons_learned="$8"
-
-    sqlite3 "$DB_PATH" <<SQL
-INSERT INTO completions (worker_id, summary, files_changed, tests_added, pr_url, merged, follow_up_issues, lessons_learned)
-VALUES ($worker_id, '$summary', '$files_changed', '$tests_added', '$pr_url', $merged, '$follow_up_issues', '$lessons_learned');
-SQL
-
-    db_update_status "$worker_id" "done"
-}
-
-# Mark worker as failed
-db_mark_failed() {
-    local worker_id="$1"
-    local reason="${2:-unknown}"
-
-    db_update_status "$worker_id" "failed"
-    db_log_event "$worker_id" "failed" "$reason"
-}
-
-# Parse issue argument which may be "issue" or "repo:issue"
-# Sets PARSED_REPO and PARSED_ISSUE variables
-parse_issue_arg() {
-    local input="$1"
-    PARSED_REPO=""
-    PARSED_ISSUE=""
-
-    if [[ "$input" == *:* ]]; then
-        # repo:issue format
-        PARSED_REPO="${input%%:*}"
-        PARSED_ISSUE="${input#*:}"
-    else
-        # Just issue number - default to current repo
-        PARSED_ISSUE="$input"
-        if git rev-parse --show-toplevel &>/dev/null; then
-            PARSED_REPO=$(basename "$(git rev-parse --show-toplevel)")
-        fi
-    fi
-}
-
-# Get worker ID by issue or PR number, optionally filtered by repo
-# Searches both issue_number and pr_number columns
-db_get_worker_by_issue() {
-    local number="$1"
-    local repo_name="${2:-}"
-
-    local repo_filter=""
-    if [[ -n "$repo_name" ]]; then
-        repo_filter="AND repo_name='$repo_name'"
-    fi
-
-    sqlite3 "$DB_PATH" "SELECT id FROM workers WHERE (issue_number=$number OR pr_number=$number) $repo_filter AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;"
-}
-
-# Get worker ID by branch name
-db_get_worker_by_branch() {
-    local branch="$1"
-    sqlite3 "$DB_PATH" "SELECT id FROM workers WHERE branch='$branch' AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;"
-}
-
-# Check if a worker process is still running
-is_worker_alive() {
-    local pid="$1"
-    kill -0 "$pid" 2>/dev/null
-}
-
-# Clean up stale workers (processes that are no longer running)
-db_cleanup_stale_workers() {
-    init_db
-
-    local stale_pids
-    stale_pids=$(sqlite3 "$DB_PATH" "SELECT id, pid FROM workers WHERE status NOT IN ('done', 'failed');")
-
-    while IFS='|' read -r worker_id pid; do
-        if [[ -n "$worker_id" ]] && ! is_worker_alive "$pid"; then
-            db_update_status "$worker_id" "failed"
-            db_log_event "$worker_id" "cleanup" "Process $pid no longer running"
-        fi
-    done <<< "$stale_pids"
-}
-
-# Send a message to a worker
-db_send_message() {
-    local worker_id="$1"
-    local message_type="$2"
-    local payload="$3"
-
-    # Escape single quotes in payload
-    payload="${payload//\'/\'\'}"
-
-    sqlite3 "$DB_PATH" "INSERT INTO messages (worker_id, message_type, payload) VALUES ($worker_id, '$message_type', '$payload');"
-    db_log_event "$worker_id" "message_sent" "$message_type: $payload"
-}
-
-# Get unread messages for a worker
-db_get_messages() {
-    local worker_id="$1"
-    local mark_read="${2:-false}"
-
-    sqlite3 -separator '|' "$DB_PATH" "
-        SELECT id, message_type, payload, created_at
-        FROM messages
-        WHERE worker_id = $worker_id AND read_at IS NULL
-        ORDER BY created_at ASC;
-    "
-
-    if [[ "$mark_read" == "true" ]]; then
-        sqlite3 "$DB_PATH" "UPDATE messages SET read_at = CURRENT_TIMESTAMP WHERE worker_id = $worker_id AND read_at IS NULL;"
-    fi
-}
-
-# Mark specific message as read
-db_mark_message_read() {
-    local message_id="$1"
-    sqlite3 "$DB_PATH" "UPDATE messages SET read_at = CURRENT_TIMESTAMP WHERE id = $message_id;"
-}
-
-# Get message count for a worker
-db_get_message_count() {
-    local worker_id="$1"
-    sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM messages WHERE worker_id = $worker_id AND read_at IS NULL;"
-}
-
-# ============================================================================
-# Management Commands
-# ============================================================================
-
-# Show status of all active workers
-cmd_status() {
-    init_db
-    db_cleanup_stale_workers
-
-    echo "Active Workers:"
-    echo "-------------------------------------------------------------------------------"
-    printf "%-20s | %-6s | %-10s | %-17s | %s\n" "repo_name" "issue" "status" "stage" "mins_idle"
-    echo "-------------------------------------------------------------------------------"
-
-    sqlite3 -separator '|' "$DB_PATH" "
-        SELECT repo_name, COALESCE(issue_number, '-'), status, COALESCE(stage, phase),
-               CAST((julianday('now') - julianday(updated_at)) * 24 * 60 AS INTEGER)
-        FROM workers
-        WHERE status NOT IN ('done', 'failed')
-        ORDER BY updated_at DESC;
-    " | while IFS='|' read -r repo_name issue status stage mins_idle; do
-        printf "%-20s | %-6s | %-10s | %-17s | %s\n" "$repo_name" "$issue" "$status" "$stage" "$mins_idle"
-    done
-
-    local count
-    count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM workers WHERE status NOT IN ('done', 'failed');")
-    echo "-------------------------------------------------------------------------------"
-    echo "Total active workers: $count"
-}
-
-# Show recent events
-cmd_events() {
-    local issue_filter="${1:-}"
-    init_db
-
-    echo "Recent Events:"
-    echo "-------------------------------------------------------------------------------"
-
-    local query
-    if [[ -n "$issue_filter" ]]; then
-        parse_issue_arg "$issue_filter"
-        local where_clause="WHERE w.issue_number = $PARSED_ISSUE"
-        if [[ -n "$PARSED_REPO" ]]; then
-            where_clause="$where_clause AND w.repo_name = '$PARSED_REPO'"
-        fi
-        query="
-            SELECT w.repo_name, w.issue_number, e.event_type, e.message, e.created_at
-            FROM events e
-            JOIN workers w ON e.worker_id = w.id
-            $where_clause
-            ORDER BY e.created_at DESC
-            LIMIT 50;
-        "
-    else
-        query="
-            SELECT w.repo_name, w.issue_number, e.event_type, e.message, e.created_at
-            FROM events e
-            JOIN workers w ON e.worker_id = w.id
-            ORDER BY e.created_at DESC
-            LIMIT 50;
-        "
-    fi
-
-    sqlite3 -separator '|' "$DB_PATH" "$query" | while IFS='|' read -r repo_name issue event_type message created_at; do
-        local display_issue="${issue:-feature}"
-        echo "[${repo_name} #${display_issue}] ${event_type}: ${message} (${created_at})"
-    done
-}
-
-# Stream logs for a specific worker
-cmd_logs() {
-    local issue_arg="$1"
-
-    if [[ -z "$issue_arg" ]]; then
-        echo "Error: --logs requires an issue number (or repo:issue)"
-        exit 1
-    fi
-
-    init_db
-    parse_issue_arg "$issue_arg"
-
-    local repo_filter=""
-    if [[ -n "$PARSED_REPO" ]]; then
-        repo_filter="AND repo_name='$PARSED_REPO'"
-    fi
-
-    # Find the worktree path for this issue/PR
-    local worktree_path
-    worktree_path=$(sqlite3 "$DB_PATH" "SELECT worktree_path FROM workers WHERE (issue_number=$PARSED_ISSUE OR pr_number=$PARSED_ISSUE) $repo_filter AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")
-
-    if [[ -z "$worktree_path" ]]; then
-        echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
-        exit 1
-    fi
-
-    # Get the worker_id for event queries
-    local worker_id
-    worker_id=$(sqlite3 "$DB_PATH" "SELECT id FROM workers WHERE (issue_number=$PARSED_ISSUE OR pr_number=$PARSED_ISSUE) $repo_filter AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")
-
-    # Claude Code stores conversation logs in ~/.claude/
-    # For now, we'll show the events as a log stream
-    echo "Events for #$PARSED_ISSUE${PARSED_REPO:+ ($PARSED_REPO)}:"
-    echo "Worktree: $worktree_path"
-    echo "-------------------------------------------------------------------------------"
-
-    sqlite3 -separator '|' "$DB_PATH" "
-        SELECT e.event_type, e.message, e.created_at
-        FROM events e
-        WHERE e.worker_id = $worker_id
-        ORDER BY e.created_at ASC;
-    " | while IFS='|' read -r event_type message created_at; do
-        echo "[${created_at}] ${event_type}: ${message}"
-    done
-
-    # Also show current status
-    echo "-------------------------------------------------------------------------------"
-    local status phase pid
-    read -r status phase pid <<< "$(sqlite3 -separator ' ' "$DB_PATH" "SELECT status, phase, pid FROM workers WHERE id=$worker_id;")"
-    echo "Current status: $status | Phase: $phase | PID: $pid"
-}
-
-# Stop a specific worker
-cmd_stop() {
-    local issue_arg="$1"
-
-    if [[ -z "$issue_arg" ]]; then
-        echo "Error: --stop requires an issue number (or repo:issue)"
-        exit 1
-    fi
-
-    init_db
-    parse_issue_arg "$issue_arg"
-
-    local repo_filter=""
-    if [[ -n "$PARSED_REPO" ]]; then
-        repo_filter="AND repo_name='$PARSED_REPO'"
-    fi
-
-    # Find the worker
-    local worker_info
-    worker_info=$(sqlite3 -separator '|' "$DB_PATH" "SELECT id, pid, repo_name FROM workers WHERE (issue_number=$PARSED_ISSUE OR pr_number=$PARSED_ISSUE) $repo_filter AND status NOT IN ('done', 'failed') ORDER BY started_at DESC LIMIT 1;")
-
-    if [[ -z "$worker_info" ]]; then
-        echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
-        exit 1
-    fi
-
-    IFS='|' read -r worker_id pid repo_name <<< "$worker_info"
-
-    echo "Stopping worker for #$PARSED_ISSUE (repo: $repo_name, PID: $pid)..."
-
-    # Send SIGTERM first, then SIGKILL if needed
-    if kill -TERM "$pid" 2>/dev/null; then
-        sleep 2
-        if is_worker_alive "$pid"; then
-            echo "Worker still running, sending SIGKILL..."
-            kill -KILL "$pid" 2>/dev/null || true
-        fi
-        db_update_status "$worker_id" "failed"
-        db_log_event "$worker_id" "stopped" "Manually stopped by user"
-        echo "Worker stopped."
-    else
-        echo "Process $pid is not running. Marking as failed."
-        db_update_status "$worker_id" "failed"
-        db_log_event "$worker_id" "cleanup" "Process not found when attempting to stop"
-    fi
-}
-
-# Send a message to a worker
-cmd_send() {
-    local issue_arg="$1"
-    shift
-    local message="$*"
-
-    if [[ -z "$issue_arg" ]]; then
-        echo "Error: --send requires an issue number (or repo:issue)"
-        echo "Usage: work --send <issue> <message>"
-        echo "       work --send repo:issue <message>"
-        echo "       work --send <issue> --type <type> <message>"
-        exit 1
-    fi
-
-    if [[ -z "$message" ]]; then
-        echo "Error: --send requires a message"
-        exit 1
-    fi
-
-    init_db
-    parse_issue_arg "$issue_arg"
-
-    # Parse optional --type flag
-    local message_type="info"
-    if [[ "$message" == --type* ]]; then
-        message_type="${message#--type }"
-        message_type="${message_type%% *}"
-        message="${message#--type $message_type }"
-    fi
-
-    # Find the worker
-    local worker_id
-    worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
-
-    if [[ -z "$worker_id" ]]; then
-        echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
-        exit 1
-    fi
-
-    db_send_message "$worker_id" "$message_type" "$message"
-    echo "Message sent to worker for #$PARSED_ISSUE${PARSED_REPO:+ ($PARSED_REPO)}"
-    echo "  Type: $message_type"
-    echo "  Message: $message"
-}
-
-# View messages for a worker (from worker's perspective)
-# Messages are marked as read by default; use --peek to view without marking
-cmd_messages() {
-    local issue_arg="${1:-}"
-    local peek_flag="${2:-}"
-
-    init_db
-
-    # If no issue specified, try to use current worker ID from environment
-    local worker_id=""
-    if [[ -n "$issue_arg" ]] && [[ "$issue_arg" != "--peek" ]]; then
-        parse_issue_arg "$issue_arg"
-        worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
-        if [[ -z "$worker_id" ]]; then
-            echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
-            exit 1
-        fi
-    elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
-        worker_id="$WORK_WORKER_ID"
-        # If first arg was --peek, capture it
-        [[ "$issue_arg" == "--peek" ]] && peek_flag="--peek"
-    else
-        echo "Error: --messages requires an issue number (or repo:issue) or must be run from within a worker session"
-        echo "Usage: work --messages [issue] [--peek]"
-        echo "       work --messages [repo:issue] [--peek]"
-        exit 1
-    fi
-
-    local count
-    count=$(db_get_message_count "$worker_id")
-
-    if [[ "$count" -eq 0 ]]; then
-        echo "No unread messages."
-        return 0
-    fi
-
-    echo "Unread Messages ($count):"
-    echo "-------------------------------------------------------------------------------"
-
-    # Mark as read by default, unless --peek is specified
-    local should_mark="true"
-    [[ "$peek_flag" == "--peek" ]] && should_mark="false"
-
-    db_get_messages "$worker_id" "$should_mark" | while IFS='|' read -r msg_id msg_type payload created_at; do
-        echo "[$created_at] ($msg_type) $payload"
-    done
-
-    echo "-------------------------------------------------------------------------------"
-    if [[ "$should_mark" == "true" ]]; then
-        echo "All messages marked as read."
-    else
-        echo "(Peek mode - messages NOT marked as read)"
-    fi
-}
-
-# Set stage for a worker (worker self-reports its current stage)
-cmd_stage() {
-    local stage="${1:-}"
-    local issue_arg="${2:-}"
-
-    if [[ -z "$stage" ]]; then
-        echo "Error: --stage requires a stage name"
-        echo "Usage: work --stage <stage> [issue]"
-        echo "       work --stage <stage> [repo:issue]"
-        echo ""
-        echo "Valid stages:"
-        echo "  exploring        - Reading issue, understanding codebase"
-        echo "  planning         - Designing approach, creating todo list"
-        echo "  implementing     - Writing code"
-        echo "  testing          - Running local tests"
-        echo "  pr_creating      - Creating PR, writing description"
-        echo "  ci_waiting       - PR created, waiting for CI to pass"
-        echo "  review_waiting   - CI passed, waiting for review"
-        echo "  review_responding - Addressing review feedback"
-        echo "  merge_conflicts  - Resolving merge conflicts"
-        echo "  done             - PR merged or issue closed"
-        echo "  blocked          - Waiting on external dependency"
-        exit 1
-    fi
-
-    init_db
-
-    # Find the worker ID
-    local worker_id=""
-    if [[ -n "$issue_arg" ]]; then
-        parse_issue_arg "$issue_arg"
-        worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
-        if [[ -z "$worker_id" ]]; then
-            echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
-            exit 1
-        fi
-    elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
-        worker_id="$WORK_WORKER_ID"
-    else
-        echo "Error: --stage requires an issue number (or repo:issue) or must be run from within a worker session"
-        echo "Usage: work --stage <stage> [issue]"
-        echo "       work --stage <stage> [repo:issue]"
-        exit 1
-    fi
-
-    if db_update_stage "$worker_id" "$stage"; then
-        echo "Stage updated to: $stage"
-    fi
-}
-
-# Mark worker as done (sets both status and stage)
-cmd_done() {
-    local issue_arg="${1:-}"
-
-    init_db
-
-    # Find the worker ID
-    local worker_id=""
-    if [[ -n "$issue_arg" ]]; then
-        parse_issue_arg "$issue_arg"
-        worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
-        if [[ -z "$worker_id" ]]; then
-            echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
-            exit 1
-        fi
-    elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
-        worker_id="$WORK_WORKER_ID"
-    else
-        echo "Error: --done requires an issue number (or repo:issue) or must be run from within a worker session"
-        echo "Usage: work --done [issue]"
-        echo "       work --done [repo:issue]"
-        exit 1
-    fi
-
-    db_update_status "$worker_id" "done"
-    db_update_stage "$worker_id" "done"
-    db_log_event "$worker_id" "completed" "Worker marked as done"
-    echo "Worker marked as done"
-}
-
-# Update PR info for a worker
-cmd_pr() {
-    local pr_number="${1:-}"
-    local pr_url="${2:-}"
-    local issue_arg="${3:-}"
-
-    if [[ -z "$pr_number" ]] || [[ -z "$pr_url" ]]; then
-        echo "Error: --pr requires PR number and URL"
-        echo "Usage: work --pr <number> <url> [issue]"
-        exit 1
-    fi
-
-    init_db
-
-    # Find the worker ID
-    local worker_id=""
-    if [[ -n "$issue_arg" ]]; then
-        parse_issue_arg "$issue_arg"
-        worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
-        if [[ -z "$worker_id" ]]; then
-            echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
-            exit 1
-        fi
-    elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
-        worker_id="$WORK_WORKER_ID"
-    else
-        echo "Error: --pr must be run from within a worker session or specify an issue"
-        echo "Usage: work --pr <number> <url> [issue]"
-        exit 1
-    fi
-
-    db_update_pr "$worker_id" "$pr_number" "$pr_url"
-    db_update_stage "$worker_id" "ci_waiting"
-    db_log_event "$worker_id" "pr_created" "PR #$pr_number created"
-    echo "PR #$pr_number registered"
-}
-
-# Log an event for a worker
-cmd_event() {
-    local event_type="${1:-}"
-    local message="${2:-}"
-    local issue_arg="${3:-}"
-
-    if [[ -z "$event_type" ]] || [[ -z "$message" ]]; then
-        echo "Error: --event requires event type and message"
-        echo "Usage: work --event <type> <message> [issue]"
-        exit 1
-    fi
-
-    init_db
-
-    # Find the worker ID
-    local worker_id=""
-    if [[ -n "$issue_arg" ]]; then
-        parse_issue_arg "$issue_arg"
-        worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
-        if [[ -z "$worker_id" ]]; then
-            echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
-            exit 1
-        fi
-    elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
-        worker_id="$WORK_WORKER_ID"
-    else
-        echo "Error: --event must be run from within a worker session or specify an issue"
-        echo "Usage: work --event <type> <message> [issue]"
-        exit 1
-    fi
-
-    db_log_event "$worker_id" "$event_type" "$message"
-    echo "Event logged: $event_type"
-}
-
-# Transition worker state (status, phase, stage) with optional event
-cmd_transition() {
-    local status="${1:-}"
-    local phase="${2:-}"
-    local stage="${3:-}"
-    local event_type="${4:-}"
-    local message="${5:-}"
-    local issue_arg="${6:-}"
-
-    if [[ -z "$status" ]] || [[ -z "$phase" ]] || [[ -z "$stage" ]]; then
-        echo "Error: --transition requires status, phase, and stage"
-        echo "Usage: work --transition <status> <phase> <stage> [event_type] [message] [issue]"
-        exit 1
-    fi
-
-    init_db
-
-    # Find the worker ID
-    local worker_id=""
-    if [[ -n "$issue_arg" ]]; then
-        parse_issue_arg "$issue_arg"
-        worker_id=$(db_get_worker_by_issue "$PARSED_ISSUE" "$PARSED_REPO")
-        if [[ -z "$worker_id" ]]; then
-            echo "Error: No active worker found for #$PARSED_ISSUE${PARSED_REPO:+ in $PARSED_REPO}"
-            exit 1
-        fi
-    elif [[ -n "${WORK_WORKER_ID:-}" ]]; then
-        worker_id="$WORK_WORKER_ID"
-    else
-        echo "Error: --transition must be run from within a worker session or specify an issue"
-        echo "Usage: work --transition <status> <phase> <stage> [event_type] [message] [issue]"
-        exit 1
-    fi
-
-    db_update_status "$worker_id" "$status" "$phase"
-    db_update_stage "$worker_id" "$stage"
-    if [[ -n "$event_type" ]] && [[ -n "$message" ]]; then
-        db_log_event "$worker_id" "$event_type" "$message"
-    fi
-    echo "Transitioned to: status=$status phase=$phase stage=$stage"
-}
-
-# ============================================================================
-# Terminal Detection and Spawning
-# ============================================================================
-
-# Find Windows Terminal executable in WSL
-find_wt_exe() {
-    # Check if wt.exe is in PATH
-    if command -v wt.exe &>/dev/null; then
-        echo "wt.exe"
-        return 0
-    fi
-
-    # Look in common Windows Terminal locations
-    local wt_path
-    for wt_path in /mnt/c/Users/*/AppData/Local/Microsoft/WindowsApps/wt.exe; do
-        if [[ -x "$wt_path" ]]; then
-            echo "$wt_path"
-            return 0
-        fi
-    done
-
-    return 1
-}
-
-# Detect terminal environment
-# Sets SPAWN_METHOD to: "iterm2", "wsl", or ""
-# Sets WT_EXE for WSL method
-detect_spawn_method() {
-    SPAWN_METHOD=""
-    WT_EXE=""
-
-    # Check for macOS + iTerm2
-    if [[ "$(uname)" == "Darwin" ]]; then
-        if osascript -e 'tell application "System Events" to (name of processes) contains "iTerm2"' 2>/dev/null | grep -q "true"; then
-            SPAWN_METHOD="iterm2"
-            return 0
-        fi
-    fi
-
-    # Check for WSL + Windows Terminal
-    if [[ -n "${WSL_DISTRO_NAME:-}" ]] || grep -qi microsoft /proc/version 2>/dev/null; then
-        WT_EXE=$(find_wt_exe)
-        if [[ -n "$WT_EXE" ]]; then
-            SPAWN_METHOD="wsl"
-            return 0
-        fi
-    fi
-
-    return 1
-}
-
-# Check prerequisites for spawning
-check_spawn_prerequisites() {
-    if ! detect_spawn_method; then
-        echo "Error: No supported terminal detected for spawning new tabs."
-        echo "Supported environments:"
-        echo "  - macOS with iTerm2 running"
-        echo "  - WSL with Windows Terminal"
-        echo ""
-        echo "Use --here to run in current terminal instead."
-        exit 1
-    fi
-}
-
-# Spawn a single issue in a new iTerm2 tab
-spawn_in_new_tab_iterm2() {
-    local issue="$1"
-
-    # Capture current directory
-    local current_dir
-    current_dir="$(pwd)"
-
-    # Safely escape parameters for shell
-    local escaped_issue escaped_dir escaped_script
-    escaped_issue=$(printf '%q' "$issue")
-    escaped_dir=$(printf '%q' "$current_dir")
-    escaped_script=$(printf '%q' "${SCRIPT_DIR}/work")
-
-    # Build the command to run in the new tab
-    local cmd="${escaped_script} --here ${escaped_issue}"
-
-    # Use AppleScript to create a new tab and run the command
-    osascript <<EOF
+"""
+
+
+@contextmanager
+def get_db() -> Iterator[sqlite3.Connection]:
+    """Get a database connection with row factory."""
+    config.worktree_base.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(config.db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def init_db() -> None:
+    """Initialize the database with required tables and run migrations."""
+    with get_db() as conn:
+        conn.executescript(SCHEMA)
+
+        # Check for existing columns and migrate if needed
+        cursor = conn.execute("PRAGMA table_info(workers)")
+        columns = {row["name"] for row in cursor.fetchall()}
+
+        if "stage" not in columns:
+            conn.execute("ALTER TABLE workers ADD COLUMN stage TEXT DEFAULT 'exploring'")
+        if "jira_key" not in columns:
+            conn.execute("ALTER TABLE workers ADD COLUMN jira_key TEXT")
+        if "issue_source" not in columns:
+            conn.execute("ALTER TABLE workers ADD COLUMN issue_source TEXT DEFAULT 'github'")
+
+
+def db_register_worker(
+    repo_path: str,
+    repo_name: str,
+    issue_number: Optional[int],
+    branch: str,
+    worktree_path: str,
+    pid: int,
+    jira_key: Optional[str] = None,
+    issue_source: str = "github"
+) -> int:
+    """Register a new worker in the database. Returns the worker ID."""
+    init_db()
+    with get_db() as conn:
+        conn.execute("""
+            INSERT OR REPLACE INTO workers
+            (repo_path, repo_name, issue_number, branch, worktree_path, pid,
+             status, phase, stage, jira_key, issue_source, started_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'starting', 'implementation', 'exploring', ?, ?,
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """, (repo_path, repo_name, issue_number, branch, worktree_path, pid,
+              jira_key, issue_source))
+
+        cursor = conn.execute(
+            "SELECT id FROM workers WHERE repo_path=? AND branch=?",
+            (repo_path, branch)
+        )
+        return cursor.fetchone()["id"]
+
+
+def db_update_status(worker_id: int, status: str, phase: Optional[str] = None) -> None:
+    """Update worker status and optional phase."""
+    with get_db() as conn:
+        if phase:
+            conn.execute(
+                "UPDATE workers SET status=?, phase=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (status, phase, worker_id)
+            )
+        else:
+            conn.execute(
+                "UPDATE workers SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (status, worker_id)
+            )
+
+
+def db_update_stage(worker_id: int, stage: str) -> None:
+    """Update worker stage with validation."""
+    if stage not in VALID_STAGES:
+        raise click.ClickException(
+            f"Invalid stage '{stage}'. Valid stages: {', '.join(VALID_STAGES)}"
+        )
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE workers SET stage=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (stage, worker_id)
+        )
+    db_log_event(worker_id, "stage_change", f"Stage changed to: {stage}")
+
+
+def db_update_pr(worker_id: int, pr_number: int, pr_url: str) -> None:
+    """Update worker with PR information."""
+    with get_db() as conn:
+        conn.execute("""
+            UPDATE workers
+            SET pr_number=?, pr_url=?, status='pr_open', phase='ci_review',
+                updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        """, (pr_number, pr_url, worker_id))
+
+
+def db_log_event(worker_id: int, event_type: str, message: str) -> None:
+    """Log an event for a worker."""
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO events (worker_id, event_type, message) VALUES (?, ?, ?)",
+            (worker_id, event_type, message)
+        )
+
+
+def db_store_completion(
+    worker_id: int,
+    summary: str,
+    files_changed: str,
+    tests_added: str,
+    pr_url: str,
+    merged: bool,
+    follow_up_issues: str,
+    lessons_learned: str
+) -> None:
+    """Store completion summary and mark worker as done."""
+    with get_db() as conn:
+        conn.execute("""
+            INSERT INTO completions
+            (worker_id, summary, files_changed, tests_added, pr_url, merged,
+             follow_up_issues, lessons_learned)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (worker_id, summary, files_changed, tests_added, pr_url, merged,
+              follow_up_issues, lessons_learned))
+    db_update_status(worker_id, "done")
+
+
+def db_mark_failed(worker_id: int, reason: str = "unknown") -> None:
+    """Mark worker as failed."""
+    db_update_status(worker_id, "failed")
+    db_log_event(worker_id, "failed", reason)
+
+
+def db_get_worker_by_issue(identifier: str, repo_name: Optional[str] = None) -> Optional[int]:
+    """Get worker ID by issue number, PR number, or JIRA key."""
+    init_db()
+    with get_db() as conn:
+        repo_filter = "AND repo_name=?" if repo_name else ""
+        params: list = []
+
+        # Check if it looks like a JIRA key
+        if re.match(r'^[A-Z]+-[0-9]+$', identifier):
+            query = f"""
+                SELECT id FROM workers
+                WHERE jira_key=? {repo_filter}
+                AND status NOT IN ('done', 'failed')
+                ORDER BY started_at DESC LIMIT 1
+            """
+            params = [identifier]
+        else:
+            # GitHub issue/PR lookup
+            try:
+                num = int(identifier)
+                query = f"""
+                    SELECT id FROM workers
+                    WHERE (issue_number=? OR pr_number=?) {repo_filter}
+                    AND status NOT IN ('done', 'failed')
+                    ORDER BY started_at DESC LIMIT 1
+                """
+                params = [num, num]
+            except ValueError:
+                return None
+
+        if repo_name:
+            params.append(repo_name)
+
+        cursor = conn.execute(query, params)
+        row = cursor.fetchone()
+        return row["id"] if row else None
+
+
+def db_get_worker_by_branch(branch: str) -> Optional[int]:
+    """Get worker ID by branch name."""
+    with get_db() as conn:
+        cursor = conn.execute("""
+            SELECT id FROM workers
+            WHERE branch=? AND status NOT IN ('done', 'failed')
+            ORDER BY started_at DESC LIMIT 1
+        """, (branch,))
+        row = cursor.fetchone()
+        return row["id"] if row else None
+
+
+def is_worker_alive(pid: int) -> bool:
+    """Check if a worker process is still running."""
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def db_cleanup_stale_workers() -> None:
+    """Mark workers as failed if their processes are no longer running."""
+    with get_db() as conn:
+        cursor = conn.execute("""
+            SELECT id, pid FROM workers
+            WHERE status NOT IN ('done', 'failed') AND pid IS NOT NULL
+        """)
+        for row in cursor.fetchall():
+            if not is_worker_alive(row["pid"]):
+                db_mark_failed(row["id"], "Process no longer running")
+
+
+def db_send_message(worker_id: int, message_type: str, payload: str) -> None:
+    """Send a message to a worker."""
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO messages (worker_id, message_type, payload) VALUES (?, ?, ?)",
+            (worker_id, message_type, payload)
+        )
+    db_log_event(worker_id, "message_sent", f"[{message_type}] {payload[:50]}...")
+
+
+def db_get_messages(worker_id: int, mark_read: bool = True) -> list[dict]:
+    """Get unread messages for a worker, optionally marking them as read."""
+    with get_db() as conn:
+        cursor = conn.execute("""
+            SELECT id, message_type, payload, created_at
+            FROM messages
+            WHERE worker_id=? AND read_at IS NULL
+            ORDER BY created_at ASC
+        """, (worker_id,))
+        messages = [dict(row) for row in cursor.fetchall()]
+
+        if mark_read and messages:
+            msg_ids = [m["id"] for m in messages]
+            placeholders = ",".join("?" * len(msg_ids))
+            conn.execute(
+                f"UPDATE messages SET read_at=CURRENT_TIMESTAMP WHERE id IN ({placeholders})",
+                msg_ids
+            )
+
+        return messages
+
+
+def db_get_message_count(worker_id: int) -> int:
+    """Get count of unread messages for a worker."""
+    with get_db() as conn:
+        cursor = conn.execute(
+            "SELECT COUNT(*) as count FROM messages WHERE worker_id=? AND read_at IS NULL",
+            (worker_id,)
+        )
+        return cursor.fetchone()["count"]
+
+
+# =============================================================================
+# Issue Parsing
+# =============================================================================
+
+@dataclass
+class ParsedIssue:
+    """Parsed issue information."""
+    owner: Optional[str] = None
+    repo: Optional[str] = None
+    issue_type: Optional[str] = None  # "issues" or "pull"
+    number: Optional[int] = None
+    jira_key: Optional[str] = None
+    description: Optional[str] = None
+
+
+def parse_github_url(url: str) -> Optional[ParsedIssue]:
+    """Parse a GitHub issue or PR URL."""
+    # Match: https://github.com/owner/repo/issues/42 or /pull/42
+    match = re.match(
+        r'https?://(?:www\.)?github(?:\.netflix)?\.(?:com|net)/([^/]+)/([^/]+)/(issues|pull)/(\d+)',
+        url
+    )
+    if match:
+        return ParsedIssue(
+            owner=match.group(1),
+            repo=match.group(2),
+            issue_type=match.group(3),
+            number=int(match.group(4))
+        )
+    return None
+
+
+def parse_jira_key(input_str: str) -> Optional[str]:
+    """Parse a JIRA key from input (URL or plain key)."""
+    # JIRA URL: https://netflix.atlassian.net/browse/AIE-123
+    url_match = re.search(r'atlassian\.net/browse/([A-Z]+-\d+)', input_str)
+    if url_match:
+        return url_match.group(1)
+
+    # Plain JIRA key: AIE-123
+    if re.match(r'^[A-Z]+-\d+$', input_str):
+        return input_str
+
+    return None
+
+
+def parse_issue_arg(input_str: str) -> tuple[str, Optional[str]]:
+    """
+    Parse issue argument with optional repo prefix.
+    Returns (issue, repo) tuple where repo may be None.
+    Supports: 42, repo:42, AIE-123
+    """
+    if ":" in input_str and not input_str.startswith("http"):
+        repo, issue = input_str.split(":", 1)
+        return issue, repo
+    return input_str, None
+
+
+def get_repo_root() -> Optional[Path]:
+    """Get the git repository root."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True
+        )
+        return Path(result.stdout.strip())
+    except subprocess.CalledProcessError:
+        return None
+
+
+def get_current_repo_name() -> Optional[str]:
+    """Get the current repository name."""
+    root = get_repo_root()
+    return root.name if root else None
+
+
+def detect_gh_cli() -> str:
+    """Detect which GitHub CLI to use based on remote URL."""
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True, text=True, check=True
+        )
+        if "github.netflix.net" in result.stdout:
+            return "ghe"
+    except subprocess.CalledProcessError:
+        pass
+    return "gh"
+
+
+def fetch_issue_title(issue_number: int, gh_cli: str = "gh") -> Optional[str]:
+    """Fetch issue title from GitHub."""
+    try:
+        result = subprocess.run(
+            [gh_cli, "issue", "view", str(issue_number), "--json", "title"],
+            capture_output=True, text=True, check=True
+        )
+        data = json.loads(result.stdout)
+        return data.get("title")
+    except (subprocess.CalledProcessError, json.JSONDecodeError):
+        return None
+
+
+def fetch_pr_branch(pr_number: int, gh_cli: str = "gh") -> Optional[str]:
+    """Fetch the branch name for a PR."""
+    try:
+        result = subprocess.run(
+            [gh_cli, "pr", "view", str(pr_number), "--json", "headRefName"],
+            capture_output=True, text=True, check=True
+        )
+        data = json.loads(result.stdout)
+        return data.get("headRefName")
+    except (subprocess.CalledProcessError, json.JSONDecodeError):
+        return None
+
+
+def fetch_jira_summary(jira_key: str) -> Optional[str]:
+    """Fetch JIRA issue summary using acli."""
+    try:
+        result = subprocess.run(
+            ["acli", "jira", "workitem", "view", jira_key, "--json"],
+            capture_output=True, text=True, check=True
+        )
+        data = json.loads(result.stdout)
+        return data.get("fields", {}).get("summary")
+    except (subprocess.CalledProcessError, json.JSONDecodeError, FileNotFoundError):
+        return None
+
+
+def slugify(text: str, max_length: int = 50) -> str:
+    """Convert text to a URL-friendly slug."""
+    # Lowercase and replace non-alphanumeric with hyphens
+    slug = re.sub(r'[^a-z0-9]+', '-', text.lower())
+    # Remove leading/trailing hyphens
+    slug = slug.strip('-')
+    # Truncate
+    if len(slug) > max_length:
+        slug = slug[:max_length].rsplit('-', 1)[0]
+    return slug
+
+
+def find_existing_branch(pattern: str) -> Optional[str]:
+    """Find an existing branch matching a pattern."""
+    try:
+        result = subprocess.run(
+            ["git", "branch", "-a", "--list", f"*{pattern}*"],
+            capture_output=True, text=True, check=True
+        )
+        branches = result.stdout.strip().split('\n')
+        for branch in branches:
+            branch = branch.strip().lstrip('* ')
+            if branch:
+                # Remove remotes/origin/ prefix if present
+                branch = re.sub(r'^remotes/origin/', '', branch)
+                return branch
+    except subprocess.CalledProcessError:
+        pass
+    return None
+
+
+def find_existing_worktree(branch: str) -> Optional[Path]:
+    """Find existing worktree for a branch."""
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            capture_output=True, text=True, check=True
+        )
+        worktree_path = None
+        for line in result.stdout.split('\n'):
+            if line.startswith('worktree '):
+                worktree_path = Path(line.split(' ', 1)[1])
+            elif line.startswith('branch ') and branch in line:
+                return worktree_path
+    except subprocess.CalledProcessError:
+        pass
+    return None
+
+
+# =============================================================================
+# Terminal Spawning
+# =============================================================================
+
+def detect_spawn_method() -> Optional[str]:
+    """Detect available terminal spawning method."""
+    # Check for iTerm2 on macOS
+    if sys.platform == "darwin":
+        try:
+            result = subprocess.run(
+                ["osascript", "-e", 'tell application "System Events" to (name of processes) contains "iTerm2"'],
+                capture_output=True, text=True, check=True
+            )
+            if "true" in result.stdout.lower():
+                return "iterm2"
+        except subprocess.CalledProcessError:
+            pass
+
+    # Check for WSL
+    if os.environ.get("WSL_DISTRO_NAME") or os.path.exists("/proc/version"):
+        try:
+            with open("/proc/version") as f:
+                if "microsoft" in f.read().lower():
+                    # Find wt.exe
+                    for path in [
+                        "/mnt/c/Users/*/AppData/Local/Microsoft/WindowsApps/wt.exe",
+                        "/mnt/c/Program Files/WindowsApps/*/wt.exe"
+                    ]:
+                        import glob
+                        matches = glob.glob(path)
+                        if matches:
+                            return "wsl"
+        except (IOError, OSError):
+            pass
+
+    return None
+
+
+def spawn_iterm2(issue: str, script_path: Path, cwd: Path) -> None:
+    """Spawn a new iTerm2 tab with the work command."""
+    cmd = f"cd '{cwd}' && '{script_path}' --here '{issue}'"
+
+    applescript = f'''
 tell application "iTerm2"
     tell current window
         create tab with default profile
         tell current session
-            write text "cd ${escaped_dir} && ${cmd}"
+            write text "{cmd}"
         end tell
     end tell
 end tell
-EOF
-}
+'''
+    subprocess.run(["osascript", "-e", applescript], check=True)
 
-# Spawn a single issue in a new Windows Terminal tab (WSL)
-spawn_in_new_tab_wsl() {
-    local issue="$1"
 
-    # Capture current directory
-    local current_dir
-    current_dir="$(pwd)"
+def spawn_wsl(issue: str, script_path: Path, cwd: Path) -> None:
+    """Spawn a new Windows Terminal tab via WSL."""
+    distro = os.environ.get("WSL_DISTRO_NAME", "Ubuntu")
+    shell = os.path.basename(os.environ.get("SHELL", "/bin/bash"))
 
-    # Get WSL distro name
-    local distro="${WSL_DISTRO_NAME:-Ubuntu}"
+    cmd = f"cd '{cwd}' && '{script_path}' --here '{issue}'"
 
-    # Get user's default shell (zsh, bash, etc.)
-    local user_shell
-    user_shell=$(basename "${SHELL:-/bin/bash}")
+    # Find wt.exe
+    import glob
+    wt_paths = glob.glob("/mnt/c/Users/*/AppData/Local/Microsoft/WindowsApps/wt.exe")
+    if not wt_paths:
+        raise click.ClickException("Windows Terminal (wt.exe) not found")
 
-    # Build the command to run in the new tab
-    # Use single quotes for the outer command to preserve variables
-    local cmd="cd '${current_dir}' && '${SCRIPT_DIR}/work' --here '${issue}'"
+    wt_exe = wt_paths[0]
+    subprocess.run([
+        wt_exe, "-w", "0", "nt",
+        "wsl.exe", "-d", distro, "--cd", str(cwd), "--",
+        shell, "-lic", cmd
+    ], check=True)
 
-    # Use Windows Terminal to create a new tab running WSL
-    # -w 0 = use current window, nt = new tab
-    # Use wsl.exe to run the command - this avoids Windows Terminal's argument parsing issues
-    "$WT_EXE" -w 0 nt wsl.exe -d "$distro" --cd "$current_dir" -- "$user_shell" -lic "$cmd"
-}
 
-# Spawn a single issue in a new terminal tab (dispatches based on environment)
-spawn_in_new_tab() {
-    local issue="$1"
+def spawn_in_new_tab(issue: str) -> None:
+    """Spawn work command in a new terminal tab."""
+    method = detect_spawn_method()
+    if not method:
+        raise click.ClickException(
+            "No supported terminal found. Use --here to run in current terminal.\n"
+            "Supported: iTerm2 (macOS), Windows Terminal (WSL)"
+        )
 
-    case "$SPAWN_METHOD" in
-        iterm2)
-            spawn_in_new_tab_iterm2 "$issue"
-            ;;
-        wsl)
-            spawn_in_new_tab_wsl "$issue"
-            ;;
-        *)
-            echo "Error: Unknown spawn method: $SPAWN_METHOD"
-            exit 1
-            ;;
-    esac
+    script_path = Path(__file__).resolve()
+    cwd = Path.cwd()
 
-    echo "Spawned new tab for: $issue"
-}
+    if method == "iterm2":
+        spawn_iterm2(issue, script_path, cwd)
+    elif method == "wsl":
+        spawn_wsl(issue, script_path, cwd)
 
-# Slugify a string for use in branch names
-slugify() {
-    echo "$1" | tr '[:upper:]' '[:lower:]' | \
-        sed -E 's/[^a-z0-9]+/-/g' | \
-        sed -E 's/^-+|-+$//g' | \
-        cut -c1-50
-}
 
-# Extract issue number from URL or direct input
-parse_issue_input() {
-    local input="$1"
+# =============================================================================
+# Prompt Generation
+# =============================================================================
 
-    # GitHub issue or PR URL pattern
-    if [[ "$input" =~ github\.com/([^/]+)/([^/]+)/(issues|pull)/([0-9]+) ]]; then
-        ISSUE_OWNER="${BASH_REMATCH[1]}"
-        ISSUE_REPO="${BASH_REMATCH[2]}"
-        ISSUE_TYPE="${BASH_REMATCH[3]}"  # "issues" or "pull"
-        ISSUE_NUMBER="${BASH_REMATCH[4]}"
-        return 0
-    fi
+def generate_prompt(
+    task_ref: str,
+    gh_cli: str,
+    jira_key: Optional[str] = None
+) -> str:
+    """Generate the Claude Code prompt."""
 
-    # Plain issue number
-    if [[ "$input" =~ ^[0-9]+$ ]]; then
-        ISSUE_NUMBER="$input"
-        ISSUE_TYPE="issues"
-        # Try to get owner/repo from git remote
-        local remote_url
-        remote_url=$(git remote get-url origin 2>/dev/null || echo "")
-        if [[ "$remote_url" =~ github\.com[:/]([^/]+)/([^/.]+) ]]; then
-            ISSUE_OWNER="${BASH_REMATCH[1]}"
-            ISSUE_REPO="${BASH_REMATCH[2]}"
-        fi
-        return 0
-    fi
+    jira_instructions = ""
+    jira_phase1_note = ""
+    if jira_key:
+        jira_instructions = f"""
+**For JIRA issue details**: Use the Atlassian MCP tools to fetch full issue details:
+- Use `getJiraIssue` with cloudId="netflix.atlassian.net" and issueIdOrKey="{jira_key}"
+- Review the issue description, acceptance criteria, and any comments
+"""
+        jira_phase1_note = " - fetch JIRA issue details using MCP tools"
 
-    return 1
-}
-
-# Detect which GitHub CLI to use based on owner/repo
-detect_gh_cli() {
-    local remote_url
-    remote_url=$(git remote get-url origin 2>/dev/null || echo "")
-    if [[ "$remote_url" == *"github.netflix.net"* ]]; then
-        echo "ghe"
-    else
-        echo "gh"
-    fi
-}
-
-# Fetch issue title from GitHub API
-fetch_issue_title() {
-    local gh_cli
-    gh_cli=$(detect_gh_cli)
-    if command -v "$gh_cli" &>/dev/null; then
-        "$gh_cli" issue view "$ISSUE_NUMBER" --repo "${ISSUE_OWNER}/${ISSUE_REPO}" --json title -q .title 2>/dev/null || echo ""
-    elif command -v curl &>/dev/null; then
-        curl -s "https://api.github.com/repos/${ISSUE_OWNER}/${ISSUE_REPO}/issues/${ISSUE_NUMBER}" | \
-            grep -o '"title"[[:space:]]*:[[:space:]]*"[^"]*"' | \
-            sed 's/"title"[[:space:]]*:[[:space:]]*"\([^"]*\)"/\1/' || echo ""
-    else
-        echo ""
-    fi
-}
-
-# Fetch PR branch name from GitHub API
-fetch_pr_branch() {
-    local gh_cli
-    gh_cli=$(detect_gh_cli)
-    if command -v "$gh_cli" &>/dev/null; then
-        "$gh_cli" pr view "$ISSUE_NUMBER" --repo "${ISSUE_OWNER}/${ISSUE_REPO}" --json headRefName -q .headRefName 2>/dev/null || echo ""
-    else
-        echo ""
-    fi
-}
-
-# Find existing branch for an issue
-find_existing_branch() {
-    local issue_num="$1"
-    git branch -a --list "*issue-${issue_num}-*" 2>/dev/null | \
-        sed 's/^[*+ ]*//' | \
-        sed 's|remotes/origin/||' | \
-        head -1
-}
-
-# Find existing worktree for a branch
-find_existing_worktree() {
-    local branch="$1"
-    git worktree list --porcelain | \
-        grep -A1 "^worktree" | \
-        grep -B1 "branch refs/heads/${branch}$" | \
-        grep "^worktree" | \
-        sed 's/^worktree //' || true
-}
-
-# Run issue in current terminal (the original behavior)
-run_here() {
-    local input="$1"
-    local description="${2:-}"
-
-    ISSUE_NUMBER=""
-    ISSUE_OWNER=""
-    ISSUE_REPO=""
-    ISSUE_TYPE=""
-    BRANCH_NAME=""
-    WORKTREE_PATH=""
-
-    # Get repo name early for worktree path construction
-    local repo_name
-    repo_name=$(basename "$REPO_ROOT")
-
-    # Try to parse as issue reference
-    if parse_issue_input "$input"; then
-        # Check for repo mismatch when a full URL was provided
-        if [[ -n "$ISSUE_REPO" ]] && [[ "$ISSUE_REPO" != "$repo_name" ]]; then
-            echo "Error: Repository mismatch detected!"
-            echo ""
-            echo "  Issue/PR is from:  ${ISSUE_OWNER}/${ISSUE_REPO}"
-            echo "  Current repo:      ${repo_name}"
-            echo ""
-            echo "The worktree would be created from the wrong repository."
-            echo ""
-            echo "To fix this, run the work command from the correct repository:"
-            echo "  cd /path/to/${ISSUE_REPO} && work $input"
-            echo ""
-            echo "Or use just the issue number if you're in the correct repo:"
-            echo "  work ${ISSUE_NUMBER}"
-            exit 1
-        fi
-
-        if [[ "$ISSUE_TYPE" == "pull" ]]; then
-            echo "Found PR #${ISSUE_NUMBER}"
-            if [[ -n "$ISSUE_OWNER" ]] && [[ -n "$ISSUE_REPO" ]]; then
-                echo "Fetching PR branch from GitHub..."
-                BRANCH_NAME=$(fetch_pr_branch)
-            fi
-            if [[ -n "$BRANCH_NAME" ]]; then
-                echo "Found PR branch: $BRANCH_NAME"
-            else
-                echo "Could not fetch PR branch name"
-                exit 1
-            fi
-        else
-            echo "Found issue #${ISSUE_NUMBER}"
-            BRANCH_NAME=$(find_existing_branch "$ISSUE_NUMBER")
-
-            if [[ -n "$BRANCH_NAME" ]]; then
-                echo "Found existing branch: $BRANCH_NAME"
-            else
-                if [[ -z "$description" ]] && [[ -n "$ISSUE_OWNER" ]] && [[ -n "$ISSUE_REPO" ]]; then
-                    echo "Fetching issue title from GitHub..."
-                    description=$(fetch_issue_title)
-                fi
-
-                if [[ -n "$description" ]]; then
-                    BRANCH_NAME="issue-${ISSUE_NUMBER}-$(slugify "$description")"
-                else
-                    BRANCH_NAME="issue-${ISSUE_NUMBER}"
-                fi
-                echo "Will create new branch: $BRANCH_NAME"
-            fi
-        fi
-    else
-        description="$input"
-        BRANCH_NAME="feature-$(slugify "$description")"
-
-        if git show-ref --verify --quiet "refs/heads/${BRANCH_NAME}" 2>/dev/null; then
-            echo "Found existing branch: $BRANCH_NAME"
-        else
-            echo "Will create new branch: $BRANCH_NAME"
-        fi
-    fi
-
-    # Check for existing worktree
-    WORKTREE_PATH=$(find_existing_worktree "$BRANCH_NAME")
-
-    if [[ -n "$WORKTREE_PATH" ]]; then
-        echo "Using existing worktree: $WORKTREE_PATH"
-    else
-        mkdir -p "${WORKTREE_BASE}/${repo_name}"
-        WORKTREE_PATH="${WORKTREE_BASE}/${repo_name}/${BRANCH_NAME}"
-
-        if [[ -d "$WORKTREE_PATH" ]]; then
-            if git -C "$WORKTREE_PATH" rev-parse --git-dir &>/dev/null; then
-                local current_branch
-                current_branch=$(git -C "$WORKTREE_PATH" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-                if [[ "$current_branch" == "$BRANCH_NAME" ]]; then
-                    echo "Using existing directory (not registered as worktree): $WORKTREE_PATH"
-                else
-                    echo "Error: Directory exists but is on branch '$current_branch', expected '$BRANCH_NAME'"
-                    exit 1
-                fi
-            else
-                echo "Error: Directory exists but is not a valid git directory: $WORKTREE_PATH"
-                exit 1
-            fi
-        elif git show-ref --verify --quiet "refs/heads/${BRANCH_NAME}" 2>/dev/null; then
-            echo "Creating worktree for existing branch..."
-            git worktree add "$WORKTREE_PATH" "$BRANCH_NAME"
-        elif git show-ref --verify --quiet "refs/remotes/origin/${BRANCH_NAME}" 2>/dev/null; then
-            echo "Creating worktree for remote branch..."
-            git worktree add "$WORKTREE_PATH" "$BRANCH_NAME"
-        else
-            echo "Creating worktree with new branch from ${MAIN_BRANCH}..."
-            git worktree add -b "$BRANCH_NAME" "$WORKTREE_PATH" "$MAIN_BRANCH"
-        fi
-    fi
-
-    # Build the prompt for Claude
-    local task_ref=""
-    if [[ -n "$ISSUE_NUMBER" ]] && [[ -n "$ISSUE_OWNER" ]] && [[ -n "$ISSUE_REPO" ]]; then
-        if [[ "$ISSUE_TYPE" == "pull" ]]; then
-            task_ref="GitHub PR https://github.com/${ISSUE_OWNER}/${ISSUE_REPO}/pull/${ISSUE_NUMBER}"
-        else
-            task_ref="GitHub issue https://github.com/${ISSUE_OWNER}/${ISSUE_REPO}/issues/${ISSUE_NUMBER}"
-        fi
-    elif [[ -n "$ISSUE_NUMBER" ]]; then
-        task_ref="issue #${ISSUE_NUMBER}"
-    else
-        task_ref="${description}"
-    fi
-
-    # Detect GitHub CLI to use based on remote URL
-    local gh_cli
-    gh_cli=$(detect_gh_cli)
-
-    local prompt
-    prompt=$(cat <<EOF
-Complete this task end-to-end: ${task_ref}
+    return f"""Complete this task end-to-end: {task_ref}
 
 **IMPORTANT**: Read CLAUDE.md first for project-specific instructions (test commands, labels, coding standards, etc.)
-
+{jira_instructions}
 ## Workflow
 
 ### Phase 1: Implementation
 1. Read CLAUDE.md to understand project conventions and commands
-2. Read and understand the task requirements
+2. Read and understand the task requirements{jira_phase1_note}
 3. Plan the implementation approach
 4. Implement the changes with appropriate tests
 5. Run tests locally using the command specified in CLAUDE.md
 6. Commit your changes with descriptive commit messages
 
 ### Phase 2: Pull Request
-1. Push your branch and open a PR using \`${gh_cli} pr create\`
+1. Push your branch and open a PR using `{gh_cli} pr create`
 2. Link the PR to the issue if applicable
 
 ### Phase 3: CI & Review Loop
 Repeat until the PR is ready to merge:
 
-1. **Wait for CI**: Use \`${gh_cli} pr checks --watch\` to monitor CI status
-2. **Handle CI failures**: If CI fails, investigate logs with \`${gh_cli} pr checks\` and \`${gh_cli} run view\`, fix issues, push fixes
-3. **Check for reviews**: Use \`${gh_cli} pr view --comments\` and \`${gh_cli} api repos/{owner}/{repo}/pulls/{pr}/reviews\` to check for review feedback
+1. **Wait for CI**: Use `{gh_cli} pr checks --watch` to monitor CI status
+2. **Handle CI failures**: If CI fails, investigate logs with `{gh_cli} pr checks` and `{gh_cli} run view`, fix issues, push fixes
+3. **Check for reviews**: Use `{gh_cli} pr view --comments` and `{gh_cli} api repos/{{owner}}/{{repo}}/pulls/{{pr}}/reviews` to check for review feedback
 4. **Address critical feedback**: Fix any issues marked as "REQUEST_CHANGES" or critical comments. Respond to review comments as you address them.
 5. **Re-request review if needed**: After addressing feedback, re-request review if appropriate
 
 ### Phase 4: Merge
-Once CI passes and there are no blocking reviews:
-1. Merge the PR using \`${gh_cli} pr merge <PR-NUMBER> --squash\`
+**IMPORTANT: NEVER merge without at least one approving review.**
+
+Prerequisites before merging:
+- CI checks must pass
+- At least one reviewer must have APPROVED the PR (not just "Requested")
+- No reviews with "REQUEST_CHANGES" status remain unaddressed
+
+If reviewers are assigned but haven't reviewed yet, WAIT for their review. Do NOT merge PRs that only show "Requested" reviewers with no actual approvals.
+
+Once you have approval:
+1. Merge the PR using `{gh_cli} pr merge <PR-NUMBER> --squash`
 2. Confirm the merge succeeded
 
 ### Phase 5: Follow-up Issues (REQUIRED)
@@ -1236,10 +734,10 @@ Once CI passes and there are no blocking reviews:
 ### Phase 6: Completion Summary (REQUIRED)
 Before exiting, write a completion summary to help with future reference:
 
-\`\`\`bash
+```bash
 # Mark worker as done
 work --done
-\`\`\`
+```
 
 Then output a summary including:
 - **What was accomplished**: Brief description of the completed work
@@ -1254,137 +752,649 @@ Then output a summary including:
 - Follow any project-specific guidelines in CLAUDE.md
 - If blocked by external factors (permissions, unclear requirements), explain and stop
 - **Check for messages**: Periodically check for messages from the parent session:
-  \`\`\`bash
+  ```bash
   work --messages  # Uses WORK_WORKER_ID from environment
-  \`\`\`
+  ```
   Messages may contain priority changes, additional context, or instructions.
-EOF
-)
+"""
 
-    # Set terminal tab/window title (works for iTerm2 and Windows Terminal)
-    local title=""
-    if [[ -n "$ISSUE_NUMBER" ]]; then
-        title="Issue #${ISSUE_NUMBER}"
-    else
-        title="${description:0:30}"
-    fi
-    printf '\033]0;%s\007' "$title"
 
-    echo ""
-    echo "  Worktree: $WORKTREE_PATH"
-    echo "  Branch:   $BRANCH_NAME"
-    echo "  Task:     $task_ref"
-    echo ""
+# =============================================================================
+# CLI Commands
+# =============================================================================
 
-    # Check if we're already inside a Claude Code session
-    if [[ -n "${CLAUDE_CODE:-}" ]]; then
-        echo "Already in Claude Code session. Outputting task info:"
-        echo ""
-        echo "=== TASK PROMPT ==="
-        echo "$prompt"
-        echo "=== END PROMPT ==="
-        echo ""
-        echo "Worktree ready at: $WORKTREE_PATH"
-        exit 0
-    fi
+@click.group(invoke_without_command=True)
+@click.argument('issues', nargs=-1)
+@click.option('--here', is_flag=True, help='Run in current terminal instead of spawning new tab')
+@click.option('--status', 'show_status', is_flag=True, help='Show status of all active workers')
+@click.option('--events', 'show_events', is_flag=True, help='Show recent worker events')
+@click.option('--logs', 'show_logs', is_flag=True, help='Stream worker output')
+@click.option('--stop', 'do_stop', is_flag=True, help='Terminate a specific worker')
+@click.option('--send', 'do_send', is_flag=True, help='Send a message to a worker')
+@click.option('--messages', 'show_messages', is_flag=True, help='View pending messages')
+@click.option('--peek', is_flag=True, help='View messages without marking as read')
+@click.option('--stage', 'set_stage', help='Set worker stage')
+@click.option('--done', 'mark_done', is_flag=True, help='Mark worker as done')
+@click.option('--pr', 'set_pr', nargs=2, help='Register PR number and URL')
+@click.option('--event', 'log_event', nargs=2, help='Log an event (type, message)')
+@click.option('--transition', nargs=3, help='Transition status, phase, stage')
+@click.option('--type', 'msg_type', default='info', help='Message type for --send')
+@click.pass_context
+def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send,
+        show_messages, peek, set_stage, mark_done, set_pr, log_event, transition, msg_type):
+    """
+    Start Claude Code session(s) for GitHub issue(s) or JIRA tickets.
 
-    # Register worker in database
-    local worker_id
-    worker_id=$(db_register_worker "$REPO_ROOT" "$repo_name" "$ISSUE_NUMBER" "$BRANCH_NAME" "$WORKTREE_PATH" "$$")
-    db_log_event "$worker_id" "started" "Worker started for ${task_ref}"
-    db_update_status "$worker_id" "running" "implementation"
+    \b
+    Examples:
+      work 97 98 99                    # Spawn 3 issues in new tabs
+      work https://github.com/owner/repo/issues/42
+      work --here 42 "fix memory leak"  # Run in current terminal
+      work "add dark mode support"      # New feature branch
+      work AIE-123                       # JIRA issue
 
-    # Export worker ID for potential use by hooks or child processes
-    export WORK_WORKER_ID="$worker_id"
-    export WORK_DB_PATH="$DB_PATH"
+    \b
+    Worker Management:
+      work --status                    # Show all active workers
+      work --events [issue]            # Show recent events
+      work --logs <issue>              # Stream worker output
+      work --stop <issue>              # Signal worker to stop
+      work --send <issue> <message>    # Send message to worker
+      work --messages [issue]          # View and mark messages as read
+      work --messages [issue] --peek   # View without marking as read
+      work --stage <stage> [issue]     # Set worker stage
+      work --done [issue]              # Mark worker as done
+      work --pr <number> <url> [issue] # Register PR for worker
+      work --event <type> <msg> [issue] # Log an event
+    """
 
-    echo "Starting Claude Code session..."
-    echo "  Worker ID: $worker_id"
+    # Handle management commands
+    if show_status:
+        cmd_status()
+        return
 
-    cd "$WORKTREE_PATH"
-    exec claude --dangerously-skip-permissions "$prompt"
-}
+    if show_events:
+        issue = issues[0] if issues else None
+        cmd_events(issue)
+        return
 
-# Main logic
-main() {
-    if [[ $# -lt 1 ]]; then
-        usage
-    fi
+    if show_logs:
+        if not issues:
+            raise click.ClickException("--logs requires an issue argument")
+        cmd_logs(issues[0])
+        return
 
-    case "$1" in
-        --help|-h)
-            usage
-            ;;
-        --status)
-            cmd_status
-            ;;
-        --events)
-            shift
-            cmd_events "$@"
-            ;;
-        --logs)
-            shift
-            cmd_logs "$1"
-            ;;
-        --stop)
-            shift
-            cmd_stop "$1"
-            ;;
-        --send)
-            shift
-            cmd_send "$@"
-            ;;
-        --messages)
-            shift
-            cmd_messages "$@"
-            ;;
-        --stage)
-            shift
-            cmd_stage "$@"
-            ;;
-        --done)
-            shift
-            cmd_done "$@"
-            ;;
-        --pr)
-            shift
-            cmd_pr "$@"
-            ;;
-        --event)
-            shift
-            cmd_event "$@"
-            ;;
-        --transition)
-            shift
-            cmd_transition "$@"
-            ;;
-        --here)
-            # Run in current terminal
-            shift
-            if [[ $# -lt 1 ]]; then
-                echo "Error: --here requires an issue or description"
-                exit 1
-            fi
-            run_here "$@"
-            ;;
-        *)
-            # Default: spawn in new tab(s)
-            check_spawn_prerequisites
+    if do_stop:
+        if not issues:
+            raise click.ClickException("--stop requires an issue argument")
+        cmd_stop(issues[0])
+        return
 
-            # Spawn each argument in its own tab
-            for issue in "$@"; do
-                spawn_in_new_tab "$issue"
-                if [[ $# -gt 1 ]]; then
-                    sleep "$SPAWN_DELAY"
-                fi
-            done
+    if do_send:
+        if len(issues) < 2:
+            raise click.ClickException("--send requires <issue> <message>")
+        cmd_send(issues[0], " ".join(issues[1:]), msg_type)
+        return
 
-            if [[ $# -gt 1 ]]; then
-                echo ""
-                echo "Spawned $# tabs for: $*"
-            fi
-            ;;
-    esac
-}
+    if show_messages:
+        issue = issues[0] if issues else None
+        cmd_messages(issue, peek)
+        return
 
-main "$@"
+    if set_stage:
+        issue = issues[0] if issues else None
+        cmd_stage(set_stage, issue)
+        return
+
+    if mark_done:
+        issue = issues[0] if issues else None
+        cmd_done(issue)
+        return
+
+    if set_pr:
+        pr_number, pr_url = set_pr
+        issue = issues[0] if issues else None
+        cmd_pr(int(pr_number), pr_url, issue)
+        return
+
+    if log_event:
+        event_type, message = log_event
+        issue = issues[0] if issues else None
+        cmd_event(event_type, message, issue)
+        return
+
+    if transition:
+        status, phase, stage = transition
+        # Check for optional event logging args
+        event_type = issues[0] if len(issues) > 0 else None
+        message = issues[1] if len(issues) > 1 else None
+        issue = issues[2] if len(issues) > 2 else None
+        cmd_transition(status, phase, stage, event_type, message, issue)
+        return
+
+    # Default: spawn issues
+    if not issues:
+        click.echo(ctx.get_help())
+        return
+
+    if here:
+        # Run in current terminal
+        description = issues[1] if len(issues) > 1 else None
+        run_here(issues[0], description)
+    else:
+        # Spawn in new tabs
+        for i, issue in enumerate(issues):
+            if i > 0:
+                time.sleep(config.spawn_delay)
+            spawn_in_new_tab(issue)
+            click.echo(f"Spawned worker for: {issue}")
+
+
+def cmd_status():
+    """Show status of all active workers."""
+    init_db()
+    db_cleanup_stale_workers()
+
+    click.echo("Active Workers:")
+    click.echo("-" * 85)
+    click.echo(f"{'repo_name':<20} | {'issue':<12} | {'status':<10} | {'stage':<17} | mins_idle")
+    click.echo("-" * 85)
+
+    with get_db() as conn:
+        cursor = conn.execute("""
+            SELECT repo_name,
+                   COALESCE(jira_key, CAST(issue_number AS TEXT), '-') as issue,
+                   status,
+                   COALESCE(stage, phase) as stage,
+                   CAST((julianday('now') - julianday(updated_at)) * 24 * 60 AS INTEGER) as mins_idle
+            FROM workers
+            WHERE status NOT IN ('done', 'failed')
+            ORDER BY updated_at DESC
+        """)
+        for row in cursor:
+            click.echo(f"{row['repo_name']:<20} | {row['issue']:<12} | {row['status']:<10} | {row['stage']:<17} | {row['mins_idle']}")
+
+        cursor = conn.execute(
+            "SELECT COUNT(*) as count FROM workers WHERE status NOT IN ('done', 'failed')"
+        )
+        count = cursor.fetchone()["count"]
+
+    click.echo("-" * 85)
+    click.echo(f"Total active workers: {count}")
+
+
+def cmd_events(issue: Optional[str] = None):
+    """Show recent worker events."""
+    init_db()
+
+    with get_db() as conn:
+        if issue:
+            identifier, repo = parse_issue_arg(issue)
+            worker_id = db_get_worker_by_issue(identifier, repo)
+            if not worker_id:
+                raise click.ClickException(f"No active worker found for: {issue}")
+
+            cursor = conn.execute("""
+                SELECT e.created_at, w.repo_name,
+                       COALESCE(w.jira_key, CAST(w.issue_number AS TEXT), '-') as issue,
+                       e.event_type, e.message
+                FROM events e
+                JOIN workers w ON e.worker_id = w.id
+                WHERE e.worker_id = ?
+                ORDER BY e.created_at DESC
+                LIMIT 50
+            """, (worker_id,))
+        else:
+            cursor = conn.execute("""
+                SELECT e.created_at, w.repo_name,
+                       COALESCE(w.jira_key, CAST(w.issue_number AS TEXT), '-') as issue,
+                       e.event_type, e.message
+                FROM events e
+                JOIN workers w ON e.worker_id = w.id
+                ORDER BY e.created_at DESC
+                LIMIT 50
+            """)
+
+        click.echo("Recent Events:")
+        click.echo("-" * 100)
+        for row in cursor:
+            click.echo(f"[{row['created_at']}] {row['repo_name']}#{row['issue']} ({row['event_type']}): {row['message']}")
+        click.echo("-" * 100)
+
+
+def cmd_logs(issue: str):
+    """Show logs for a specific worker."""
+    init_db()
+    identifier, repo = parse_issue_arg(issue)
+    worker_id = db_get_worker_by_issue(identifier, repo)
+
+    if not worker_id:
+        raise click.ClickException(f"No active worker found for: {issue}")
+
+    with get_db() as conn:
+        cursor = conn.execute(
+            "SELECT status, phase, pid FROM workers WHERE id=?",
+            (worker_id,)
+        )
+        row = cursor.fetchone()
+        if row:
+            click.echo(f"Worker Status: {row['status']} | Phase: {row['phase']} | PID: {row['pid']}")
+            click.echo("-" * 60)
+
+        cursor = conn.execute("""
+            SELECT created_at, event_type, message
+            FROM events WHERE worker_id = ?
+            ORDER BY created_at DESC
+            LIMIT 50
+        """, (worker_id,))
+
+        for row in cursor:
+            click.echo(f"[{row['created_at']}] ({row['event_type']}): {row['message']}")
+
+
+def cmd_stop(issue: str):
+    """Stop a worker."""
+    init_db()
+    identifier, repo = parse_issue_arg(issue)
+    worker_id = db_get_worker_by_issue(identifier, repo)
+
+    if not worker_id:
+        raise click.ClickException(f"No active worker found for: {issue}")
+
+    with get_db() as conn:
+        cursor = conn.execute("SELECT pid FROM workers WHERE id=?", (worker_id,))
+        row = cursor.fetchone()
+        if not row or not row["pid"]:
+            raise click.ClickException("Worker has no PID")
+
+        pid = row["pid"]
+
+    try:
+        os.kill(pid, signal.SIGTERM)
+        click.echo(f"Sent SIGTERM to PID {pid}")
+        time.sleep(1)
+
+        if is_worker_alive(pid):
+            os.kill(pid, signal.SIGKILL)
+            click.echo(f"Sent SIGKILL to PID {pid}")
+    except (OSError, ProcessLookupError) as e:
+        click.echo(f"Process already terminated: {e}")
+
+    db_mark_failed(worker_id, "Stopped by user")
+    click.echo(f"Worker marked as failed")
+
+
+def cmd_send(issue: str, message: str, msg_type: str = "info"):
+    """Send a message to a worker."""
+    init_db()
+    identifier, repo = parse_issue_arg(issue)
+    worker_id = db_get_worker_by_issue(identifier, repo)
+
+    if not worker_id:
+        raise click.ClickException(f"No active worker found for: {issue}")
+
+    db_send_message(worker_id, msg_type, message)
+    click.echo(f"Message sent to worker for: {issue}")
+
+
+def cmd_messages(issue: Optional[str] = None, peek: bool = False):
+    """View pending messages for a worker."""
+    init_db()
+
+    # Try to get worker ID from environment or argument
+    worker_id = None
+    if issue:
+        identifier, repo = parse_issue_arg(issue)
+        worker_id = db_get_worker_by_issue(identifier, repo)
+    else:
+        worker_id = os.environ.get("WORK_WORKER_ID")
+        if worker_id:
+            worker_id = int(worker_id)
+
+    if not worker_id:
+        raise click.ClickException(
+            "No worker specified. Provide an issue argument or set WORK_WORKER_ID."
+        )
+
+    count = db_get_message_count(worker_id)
+    if count == 0:
+        click.echo("No unread messages.")
+        return
+
+    click.echo(f"Unread Messages ({count}):")
+    click.echo("-" * 79)
+
+    messages = db_get_messages(worker_id, mark_read=not peek)
+    for msg in messages:
+        click.echo(f"[{msg['created_at']}] ({msg['message_type']}) {msg['payload']}")
+
+    click.echo("-" * 79)
+    if not peek:
+        click.echo("All messages marked as read.")
+    else:
+        click.echo("(Peek mode - messages NOT marked as read)")
+
+
+def cmd_stage(stage: str, issue: Optional[str] = None):
+    """Set worker stage."""
+    init_db()
+
+    worker_id = None
+    if issue:
+        identifier, repo = parse_issue_arg(issue)
+        worker_id = db_get_worker_by_issue(identifier, repo)
+    else:
+        worker_id = os.environ.get("WORK_WORKER_ID")
+        if worker_id:
+            worker_id = int(worker_id)
+
+    if not worker_id:
+        raise click.ClickException(
+            "No worker specified. Provide an issue argument or set WORK_WORKER_ID."
+        )
+
+    db_update_stage(worker_id, stage)
+    click.echo(f"Stage updated to: {stage}")
+
+
+def cmd_done(issue: Optional[str] = None):
+    """Mark worker as done."""
+    init_db()
+
+    worker_id = None
+    if issue:
+        identifier, repo = parse_issue_arg(issue)
+        worker_id = db_get_worker_by_issue(identifier, repo)
+    else:
+        worker_id = os.environ.get("WORK_WORKER_ID")
+        if worker_id:
+            worker_id = int(worker_id)
+
+    if not worker_id:
+        raise click.ClickException(
+            "No worker specified. Provide an issue argument or set WORK_WORKER_ID."
+        )
+
+    db_update_status(worker_id, "done")
+    db_update_stage(worker_id, "done")
+    db_log_event(worker_id, "completed", "Worker marked as done")
+    click.echo("Worker marked as done.")
+
+
+def cmd_pr(pr_number: int, pr_url: str, issue: Optional[str] = None):
+    """Register PR for worker."""
+    init_db()
+
+    worker_id = None
+    if issue:
+        identifier, repo = parse_issue_arg(issue)
+        worker_id = db_get_worker_by_issue(identifier, repo)
+    else:
+        worker_id = os.environ.get("WORK_WORKER_ID")
+        if worker_id:
+            worker_id = int(worker_id)
+
+    if not worker_id:
+        raise click.ClickException(
+            "No worker specified. Provide an issue argument or set WORK_WORKER_ID."
+        )
+
+    db_update_pr(worker_id, pr_number, pr_url)
+    db_update_stage(worker_id, "ci_waiting")
+    db_log_event(worker_id, "pr_created", f"PR #{pr_number}: {pr_url}")
+    click.echo(f"PR registered: #{pr_number}")
+
+
+def cmd_event(event_type: str, message: str, issue: Optional[str] = None):
+    """Log a custom event."""
+    init_db()
+
+    worker_id = None
+    if issue:
+        identifier, repo = parse_issue_arg(issue)
+        worker_id = db_get_worker_by_issue(identifier, repo)
+    else:
+        worker_id = os.environ.get("WORK_WORKER_ID")
+        if worker_id:
+            worker_id = int(worker_id)
+
+    if not worker_id:
+        raise click.ClickException(
+            "No worker specified. Provide an issue argument or set WORK_WORKER_ID."
+        )
+
+    db_log_event(worker_id, event_type, message)
+    click.echo(f"Event logged: {event_type}")
+
+
+def cmd_transition(
+    status: str,
+    phase: str,
+    stage: str,
+    event_type: Optional[str] = None,
+    message: Optional[str] = None,
+    issue: Optional[str] = None
+):
+    """Atomic state transition."""
+    init_db()
+
+    worker_id = None
+    if issue:
+        identifier, repo = parse_issue_arg(issue)
+        worker_id = db_get_worker_by_issue(identifier, repo)
+    else:
+        worker_id = os.environ.get("WORK_WORKER_ID")
+        if worker_id:
+            worker_id = int(worker_id)
+
+    if not worker_id:
+        raise click.ClickException(
+            "No worker specified. Provide an issue argument or set WORK_WORKER_ID."
+        )
+
+    db_update_status(worker_id, status, phase)
+    db_update_stage(worker_id, stage)
+
+    if event_type and message:
+        db_log_event(worker_id, event_type, message)
+
+    click.echo(f"Transitioned to: status={status}, phase={phase}, stage={stage}")
+
+
+def run_here(input_str: str, description: Optional[str] = None):
+    """Run worker in current terminal."""
+    repo_root = get_repo_root()
+    if not repo_root:
+        raise click.ClickException("Not in a git repository")
+
+    repo_name = repo_root.name
+    gh_cli = detect_gh_cli()
+
+    # Parse input
+    issue_number: Optional[int] = None
+    issue_owner: Optional[str] = None
+    issue_repo: Optional[str] = None
+    issue_type: Optional[str] = None
+    jira_key: Optional[str] = None
+    branch_name: Optional[str] = None
+    issue_source = "github"
+
+    # Try JIRA first (if acli available), then GitHub
+    jira_key = parse_jira_key(input_str)
+    if jira_key and subprocess.run(["which", "acli"], capture_output=True).returncode == 0:
+        issue_source = "jira"
+        click.echo(f"Found JIRA issue: {jira_key}")
+
+        # Check for existing branch
+        branch_name = find_existing_branch(jira_key)
+        if branch_name:
+            click.echo(f"Found existing branch: {branch_name}")
+        else:
+            # Fetch summary if no description provided
+            if not description:
+                click.echo("Fetching issue summary from JIRA...")
+                description = fetch_jira_summary(jira_key)
+
+            if description:
+                branch_name = f"{jira_key}-{slugify(description)}"
+            else:
+                branch_name = jira_key
+            click.echo(f"Will create new branch: {branch_name}")
+    else:
+        jira_key = None  # Reset if acli not available
+
+        # Try GitHub URL/number parsing
+        parsed = parse_github_url(input_str)
+        if parsed:
+            issue_owner = parsed.owner
+            issue_repo = parsed.repo
+            issue_type = parsed.issue_type
+            issue_number = parsed.number
+
+            # Check for repo mismatch
+            if issue_repo and issue_repo != repo_name:
+                raise click.ClickException(
+                    f"Repository mismatch!\n"
+                    f"  URL is for: {issue_repo}\n"
+                    f"  Current repo: {repo_name}\n"
+                    f"Run this command from the {issue_repo} repository."
+                )
+        elif input_str.isdigit():
+            issue_number = int(input_str)
+            issue_type = "issues"
+            # Get owner/repo from remote
+            try:
+                result = subprocess.run(
+                    ["git", "remote", "get-url", "origin"],
+                    capture_output=True, text=True, check=True
+                )
+                match = re.search(r'github(?:\.netflix)?\.(?:com|net)[:/]([^/]+)/([^/.\s]+)', result.stdout)
+                if match:
+                    issue_owner = match.group(1)
+                    issue_repo = match.group(2).replace('.git', '')
+            except subprocess.CalledProcessError:
+                pass
+        else:
+            # Treat as feature description
+            description = input_str
+
+        # Find or create branch for GitHub issue
+        if issue_number:
+            click.echo(f"Found GitHub {issue_type}: #{issue_number}")
+
+            if issue_type == "pull":
+                # For PRs, fetch the branch name
+                branch_name = fetch_pr_branch(issue_number, gh_cli)
+                if branch_name:
+                    click.echo(f"PR branch: {branch_name}")
+
+            if not branch_name:
+                # Check for existing branch
+                branch_name = find_existing_branch(f"issue-{issue_number}-")
+                if branch_name:
+                    click.echo(f"Found existing branch: {branch_name}")
+                else:
+                    # Fetch title if no description
+                    if not description:
+                        click.echo("Fetching issue title...")
+                        description = fetch_issue_title(issue_number, gh_cli)
+
+                    if description:
+                        branch_name = f"issue-{issue_number}-{slugify(description)}"
+                    else:
+                        branch_name = f"issue-{issue_number}"
+                    click.echo(f"Will create new branch: {branch_name}")
+        elif description:
+            # Feature branch
+            branch_name = f"feature-{slugify(description)}"
+            click.echo(f"Will create feature branch: {branch_name}")
+
+    if not branch_name:
+        raise click.ClickException("Could not determine branch name")
+
+    # Find or create worktree
+    worktree_path = find_existing_worktree(branch_name)
+    if worktree_path:
+        click.echo(f"Using existing worktree: {worktree_path}")
+    else:
+        worktree_path = config.worktree_base / repo_name / branch_name
+        worktree_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Check if branch exists
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", branch_name],
+            capture_output=True
+        )
+
+        if result.returncode == 0:
+            # Branch exists
+            click.echo(f"Creating worktree for existing branch: {branch_name}")
+            subprocess.run(
+                ["git", "worktree", "add", str(worktree_path), branch_name],
+                check=True
+            )
+        else:
+            # Create new branch from main
+            click.echo(f"Creating worktree with new branch: {branch_name}")
+            subprocess.run(
+                ["git", "worktree", "add", "-b", branch_name, str(worktree_path), config.main_branch],
+                check=True
+            )
+
+    # Build task reference
+    task_ref = ""
+    if issue_source == "jira" and jira_key:
+        task_ref = f"JIRA issue {jira_key} (https://netflix.atlassian.net/browse/{jira_key})"
+    elif issue_number and issue_owner and issue_repo:
+        if issue_type == "pull":
+            task_ref = f"GitHub PR https://github.com/{issue_owner}/{issue_repo}/pull/{issue_number}"
+        else:
+            task_ref = f"GitHub issue https://github.com/{issue_owner}/{issue_repo}/issues/{issue_number}"
+    elif issue_number:
+        task_ref = f"Issue #{issue_number}"
+    else:
+        task_ref = description or branch_name
+
+    # Generate prompt
+    prompt = generate_prompt(task_ref, gh_cli, jira_key)
+
+    # Check if already in Claude Code
+    if os.environ.get("CLAUDE_CODE"):
+        click.echo("Already in Claude Code session. Here's the task prompt:")
+        click.echo("-" * 60)
+        click.echo(prompt)
+        return
+
+    # Set terminal title
+    title = jira_key or (f"Issue #{issue_number}" if issue_number else (description or branch_name)[:30])
+    sys.stdout.write(f"\033]0;{title}\007")
+    sys.stdout.flush()
+
+    # Register worker
+    worker_id = db_register_worker(
+        str(repo_root),
+        repo_name,
+        issue_number,
+        branch_name,
+        str(worktree_path),
+        os.getpid(),
+        jira_key,
+        issue_source
+    )
+    db_log_event(worker_id, "started", f"Worker started for {task_ref}")
+    db_update_status(worker_id, "running", "implementation")
+
+    # Set environment for hooks
+    os.environ["WORK_WORKER_ID"] = str(worker_id)
+    os.environ["WORK_DB_PATH"] = str(config.db_path)
+
+    click.echo("Starting Claude Code session...")
+    click.echo(f"  Worker ID: {worker_id}")
+
+    # Change to worktree and exec claude
+    os.chdir(worktree_path)
+    os.execvp("claude", ["claude", "--dangerously-skip-permissions", prompt])
+
+
+if __name__ == "__main__":
+    cli()

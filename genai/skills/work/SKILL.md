@@ -1,23 +1,29 @@
 ---
 name: work
-description: REQUIRED for starting work on GitHub issues. When user says "work on issue X", "start issue X", "fix issue X", or similar - ALWAYS use this skill to spawn a dedicated worker session instead of working in the current session.
+description: REQUIRED for starting work on GitHub or JIRA issues. When user says "work on issue X", "start issue X", "fix issue X", or similar - ALWAYS use this skill to spawn a dedicated worker session instead of working in the current session.
 ---
 
 # Work Script
 
-**IMPORTANT: When the user asks to work on, start, or fix a GitHub issue, USE THIS SKILL to spawn a dedicated worker. Do NOT work on the issue in the current session unless explicitly told to (e.g., "work on issue 42 here" or "in this session").**
+**IMPORTANT: When the user asks to work on, start, or fix a GitHub or JIRA issue, USE THIS SKILL to spawn a dedicated worker. Do NOT work on the issue in the current session unless explicitly told to (e.g., "work on issue 42 here" or "in this session").**
 
-The `work` script creates isolated Claude Code sessions for GitHub issues using git worktrees, with SQLite-based worker monitoring for managing multiple parallel sessions.
+The `work` script creates isolated Claude Code sessions for GitHub issues and JIRA issues using git worktrees, with SQLite-based worker monitoring for managing multiple parallel sessions.
 
 ## Usage
 
 ```bash
-# Spawn issues in new terminal tabs (default)
+# GitHub issues - spawn in new terminal tabs (default)
 work 97 98 99                    # Multiple issues in parallel
 work https://github.com/owner/repo/issues/42
 
+# JIRA issues (requires acli CLI)
+work AIE-123                     # JIRA issue key
+work AIE-123 "fix validation"   # With description for branch name
+work https://netflix.atlassian.net/browse/AIE-123
+
 # Run in current terminal
 work --here 42
+work --here AIE-123
 work --here 42 "fix memory leak"
 
 # New feature branch (not tied to an issue)
@@ -74,9 +80,14 @@ work --stop 42
 All worker management commands support flexible issue lookups:
 
 ```bash
-# By issue number (defaults to current repo)
+# By GitHub issue number (defaults to current repo)
 work --stop 42
 work --logs 42
+
+# By JIRA key
+work --stop AIE-123
+work --logs AIE-456
+work --send AIE-789 "message"
 
 # By PR number (searches both issue_number and pr_number)
 work --logs 47                  # Finds worker by its PR number
@@ -136,12 +147,31 @@ Message types:
 
 ## What it does
 
-1. Parses GitHub issue/PR URLs or numbers
-2. Fetches issue title from GitHub for branch naming
+1. Parses GitHub issue/PR URLs or numbers, or JIRA issue keys
+2. Fetches issue title from GitHub or JIRA (via `acli`) for branch naming
 3. Creates or reuses a git worktree at `~/.worktrees/{repo}/{branch}` (repo-isolated)
 4. Registers worker in SQLite database for monitoring
 5. Starts Claude Code with a structured prompt for end-to-end completion
 6. Tracks worker status and stage for visibility into workflow progress
+
+## JIRA Support
+
+JIRA issue support is automatically enabled when the Atlassian CLI (`acli`) is installed and authenticated. Without `acli`, JIRA keys are not recognized and the script works with GitHub issues only.
+
+**Install JIRA support:**
+```bash
+brew tap atlassian/homebrew-acli
+brew install acli
+acli jira auth login
+```
+
+**How it works:**
+- JIRA keys (e.g., `AIE-123`) are detected by their pattern: uppercase letters, dash, numbers
+- Issue summary is fetched using `acli jira workitem view` for branch naming
+- Workers can be looked up by JIRA key for all management commands
+- The Claude Code prompt includes instructions to fetch full JIRA issue details using MCP tools
+
+**Graceful fallback:** If `acli` is not installed, the script ignores JIRA key patterns and treats them as feature descriptions. This allows the same dotfiles to work on machines with and without JIRA integration.
 
 ## Auto-Detection Hooks
 
@@ -178,7 +208,7 @@ This eliminates manual stage reporting, ensuring accurate workflow progression t
 ## Database
 
 Worker state is stored in `~/.worktrees/work-sessions.db` with four tables:
-- `workers` - Active worker metadata (repo, issue, branch, PID, status, stage, pr_number)
+- `workers` - Active worker metadata (repo, issue_number, jira_key, issue_source, branch, PID, status, stage, pr_number)
 - `events` - History of status changes, stage transitions, and events
 - `completions` - Final summaries when workers complete
 - `messages` - Parent-to-worker message queue
@@ -211,7 +241,8 @@ Workers also export these variables for use by Claude Code:
 
 **ALWAYS use this skill when the user:**
 - Says "work on issue X", "start issue X", "fix issue X", "implement issue X"
-- Wants to work on a GitHub issue (spawn a worker, don't work here)
+- Wants to work on a GitHub issue or JIRA issue (spawn a worker, don't work here)
+- References a JIRA key like "AIE-123" or "work on AIE-123"
 - Asks to work on multiple issues in parallel
 - Wants to check on running workers (`work --status`)
 - Needs to send messages to workers (`work --send`)
