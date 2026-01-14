@@ -64,6 +64,22 @@ class WorkConfig:
     review_guidelines: str = ""
     review_strictness: str = "normal"  # "strict", "normal", "lenient"
     require_pre_merge_review: bool = True
+    review_exclude_patterns: list = None  # Files to exclude from review diff
+
+    def __post_init__(self):
+        if self.review_exclude_patterns is None:
+            # Default patterns for auto-generated files that don't need review
+            self.review_exclude_patterns = [
+                "*.lock",
+                "package-lock.json",
+                "yarn.lock",
+                "pnpm-lock.yaml",
+                "Cargo.lock",
+                "Gemfile.lock",
+                "composer.lock",
+                "poetry.lock",
+                "go.sum",
+            ]
 
 
 def load_work_config() -> WorkConfig:
@@ -80,12 +96,16 @@ def load_work_config() -> WorkConfig:
             try:
                 with open(config_path, "rb") as f:
                     data = tomli.load(f)
-                return WorkConfig(
+                wc = WorkConfig(
                     worker_guidelines=data.get("worker_guidelines", ""),
                     review_guidelines=data.get("review_guidelines", ""),
                     review_strictness=data.get("review_strictness", "normal"),
                     require_pre_merge_review=data.get("require_pre_merge_review", True),
                 )
+                # Override exclude patterns if specified in config
+                if "review_exclude_patterns" in data:
+                    wc.review_exclude_patterns = data["review_exclude_patterns"]
+                return wc
             except Exception as e:
                 click.echo(f"Warning: Failed to parse {config_path}: {e}", err=True)
 
@@ -1036,6 +1056,21 @@ review_strictness = "normal"
 
 # Whether to require review before merge (in addition to before PR)
 require_pre_merge_review = true
+
+# Files to exclude from review diff (glob patterns).
+# These files are auto-generated and don't need code review.
+# Default excludes common lock files. Set to [] to include all files.
+# review_exclude_patterns = [
+#     "*.lock",
+#     "package-lock.json",
+#     "yarn.lock",
+#     "pnpm-lock.yaml",
+#     "Cargo.lock",
+#     "Gemfile.lock",
+#     "composer.lock",
+#     "poetry.lock",
+#     "go.sum",
+# ]
 '''
 
 
@@ -1234,11 +1269,17 @@ def cmd_review(pre_merge: bool = False, dry_run: Optional[str] = None) -> None:
         click.echo("Pre-merge review not required (disabled in .work.toml)")
         sys.exit(0)
 
-    # Get diff
-    diff_cmd = ["git", "diff", "origin/main...HEAD"]
+    # Get diff, excluding auto-generated files
+    diff_cmd = ["git", "diff", "origin/main...HEAD", "--"]
+    # Add pathspec exclusions for lock files and other auto-generated content
+    diff_cmd.append(".")
+    for pattern in work_config.review_exclude_patterns:
+        diff_cmd.append(f":(exclude){pattern}")
+
     result = subprocess.run(diff_cmd, capture_output=True, text=True)
     if result.returncode != 0 or not result.stdout.strip():
-        click.echo("No changes to review.")
+        click.echo("No changes to review (or all changes are in excluded files).")
+        click.echo(f"Excluded patterns: {', '.join(work_config.review_exclude_patterns)}")
         sys.exit(0)
 
     diff = result.stdout
