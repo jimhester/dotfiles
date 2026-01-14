@@ -1,9 +1,9 @@
 #!/bin/bash
-# install-hooks.sh - Install work stage detection hooks for Claude Code
+# install-hooks.sh - Install work hooks for Claude Code
 #
 # This script:
 # 1. Creates the ~/.claude/hooks directory
-# 2. Symlinks the work-stage-detector.sh hook
+# 2. Symlinks work-stage-detector.sh (PostToolUse) and work-review-guard.sh (PreToolUse)
 # 3. Updates ~/.claude/settings.json with hook configuration
 
 set -euo pipefail
@@ -48,17 +48,18 @@ setup_directories() {
     mkdir -p "$HOOKS_DIR"
 }
 
-# Install hook script
-install_hook() {
-    local hook_source="${SCRIPT_DIR}/work-stage-detector.sh"
-    local hook_dest="${HOOKS_DIR}/work-stage-detector.sh"
+# Install a single hook script
+install_single_hook() {
+    local hook_name="$1"
+    local hook_source="${SCRIPT_DIR}/${hook_name}"
+    local hook_dest="${HOOKS_DIR}/${hook_name}"
 
     if [[ ! -f "$hook_source" ]]; then
         error "Hook script not found: $hook_source"
         exit 1
     fi
 
-    info "Installing work-stage-detector.sh..."
+    info "Installing ${hook_name}..."
 
     # Remove existing symlink or file
     if [[ -L "$hook_dest" ]] || [[ -f "$hook_dest" ]]; then
@@ -72,12 +73,53 @@ install_hook() {
     info "Hook installed: $hook_dest -> $hook_source"
 }
 
+# Install all hook scripts
+install_hooks() {
+    install_single_hook "work-stage-detector.sh"
+    install_single_hook "work-review-guard.sh"
+}
+
+# Add or update a hook in settings.json
+configure_hook() {
+    local hook_type="$1"  # PreToolUse or PostToolUse
+    local hook_name="$2"
+    local hook_config="$3"
+
+    # Read current settings
+    local current_settings
+    current_settings=$(cat "$SETTINGS_FILE")
+
+    # Check if hooks.<type> already exists
+    if echo "$current_settings" | jq -e ".hooks.${hook_type}" &>/dev/null; then
+        # Check if our hook is already configured
+        if echo "$current_settings" | jq -e ".hooks.${hook_type}[] | select(.hooks[].command | contains(\"${hook_name}\"))" &>/dev/null; then
+            info "${hook_name} already configured in ${hook_type}"
+            return 0
+        fi
+
+        # Add our hook to existing array
+        info "Adding ${hook_name} to existing ${hook_type} configuration..."
+        current_settings=$(echo "$current_settings" | jq --argjson hook "$hook_config" ".hooks.${hook_type} += [\$hook]")
+    else
+        # Create hooks.<type> array
+        info "Creating ${hook_type} hook configuration for ${hook_name}..."
+        current_settings=$(echo "$current_settings" | jq --argjson hook "$hook_config" ".hooks.${hook_type} = [\$hook]")
+    fi
+
+    echo "$current_settings" > "$SETTINGS_FILE"
+}
+
 # Update settings.json with hook configuration
 update_settings() {
     info "Updating Claude settings..."
 
-    # Hook configuration to add
-    local hook_config='{
+    # Create settings file if it doesn't exist
+    if [[ ! -f "$SETTINGS_FILE" ]]; then
+        echo '{}' > "$SETTINGS_FILE"
+    fi
+
+    # PostToolUse: work-stage-detector.sh (detects PR creation, CI status, merges)
+    local post_hook_config='{
         "matcher": "Bash",
         "hooks": [
             {
@@ -87,36 +129,20 @@ update_settings() {
             }
         ]
     }'
+    configure_hook "PostToolUse" "work-stage-detector" "$post_hook_config"
 
-    # Create settings file if it doesn't exist
-    if [[ ! -f "$SETTINGS_FILE" ]]; then
-        echo '{}' > "$SETTINGS_FILE"
-    fi
-
-    # Read current settings
-    local current_settings
-    current_settings=$(cat "$SETTINGS_FILE")
-
-    # Check if hooks.PostToolUse already exists
-    if echo "$current_settings" | jq -e '.hooks.PostToolUse' &>/dev/null; then
-        # Check if our hook is already configured
-        if echo "$current_settings" | jq -e '.hooks.PostToolUse[] | select(.hooks[].command | contains("work-stage-detector"))' &>/dev/null; then
-            info "Hook already configured in settings.json"
-            return 0
-        fi
-
-        # Add our hook to existing PostToolUse array
-        info "Adding hook to existing PostToolUse configuration..."
-        local new_settings
-        new_settings=$(echo "$current_settings" | jq --argjson hook "$hook_config" '.hooks.PostToolUse += [$hook]')
-        echo "$new_settings" > "$SETTINGS_FILE"
-    else
-        # Create hooks.PostToolUse array
-        info "Creating PostToolUse hook configuration..."
-        local new_settings
-        new_settings=$(echo "$current_settings" | jq --argjson hook "$hook_config" '.hooks.PostToolUse = [$hook]')
-        echo "$new_settings" > "$SETTINGS_FILE"
-    fi
+    # PreToolUse: work-review-guard.sh (blocks PR create/merge without review)
+    local pre_hook_config='{
+        "matcher": "Bash",
+        "hooks": [
+            {
+                "type": "command",
+                "command": "~/.claude/hooks/work-review-guard.sh",
+                "timeout": 5000
+            }
+        ]
+    }'
+    configure_hook "PreToolUse" "work-review-guard" "$pre_hook_config"
 
     info "Settings updated: $SETTINGS_FILE"
 }
@@ -124,28 +150,34 @@ update_settings() {
 # Main
 main() {
     echo "=========================================="
-    echo "Work Stage Detection Hooks Installer"
+    echo "Work Hooks Installer for Claude Code"
     echo "=========================================="
     echo ""
 
     check_dependencies
     setup_directories
-    install_hook
+    install_hooks
     update_settings
 
     echo ""
     echo "=========================================="
     info "Installation complete!"
     echo ""
-    echo "The hook will automatically detect:"
-    echo "  - PR creation (gh pr create)"
-    echo "  - CI status changes (gh pr checks)"
-    echo "  - PR merges (gh pr merge)"
-    echo "  - Merge conflicts (git rebase/merge)"
+    echo "Installed hooks:"
+    echo ""
+    echo "  work-stage-detector.sh (PostToolUse):"
+    echo "    - Detects PR creation (gh pr create)"
+    echo "    - Tracks CI status changes (gh pr checks)"
+    echo "    - Detects PR merges (gh pr merge)"
+    echo "    - Detects merge conflicts (git rebase/merge)"
+    echo ""
+    echo "  work-review-guard.sh (PreToolUse):"
+    echo "    - Blocks PR creation without passing 'work --review'"
+    echo "    - Blocks PR merge without passing 'work --review --pre-merge'"
     echo ""
     echo "To uninstall, run:"
-    echo "  rm ~/.claude/hooks/work-stage-detector.sh"
-    echo "  # Then remove the hook entry from ~/.claude/settings.json"
+    echo "  rm ~/.claude/hooks/work-*.sh"
+    echo "  # Then remove hook entries from ~/.claude/settings.json"
     echo "=========================================="
 }
 

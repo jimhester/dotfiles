@@ -1028,8 +1028,60 @@ require_pre_merge_review = true
 '''
 
 
+def ensure_hooks_installed() -> None:
+    """Check if work hooks are installed and install them if missing."""
+    hooks_dir = Path.home() / ".claude" / "hooks"
+    settings_file = Path.home() / ".claude" / "settings.json"
+
+    # Check if both hooks exist
+    stage_detector = hooks_dir / "work-stage-detector.sh"
+    review_guard = hooks_dir / "work-review-guard.sh"
+
+    hooks_missing = not stage_detector.exists() or not review_guard.exists()
+
+    # Check if settings.json has the hooks configured
+    settings_missing = False
+    if settings_file.exists():
+        try:
+            settings = json.loads(settings_file.read_text())
+            has_pre = any(
+                "work-review-guard" in h.get("hooks", [{}])[0].get("command", "")
+                for h in settings.get("hooks", {}).get("PreToolUse", [])
+            )
+            has_post = any(
+                "work-stage-detector" in h.get("hooks", [{}])[0].get("command", "")
+                for h in settings.get("hooks", {}).get("PostToolUse", [])
+            )
+            settings_missing = not has_pre or not has_post
+        except (json.JSONDecodeError, KeyError):
+            settings_missing = True
+    else:
+        settings_missing = True
+
+    if hooks_missing or settings_missing:
+        click.echo("Work hooks not fully installed. Installing...")
+
+        # Find install-hooks.sh relative to this script
+        script_dir = Path(__file__).resolve().parent
+        install_script = script_dir / "hooks" / "install-hooks.sh"
+
+        if not install_script.exists():
+            click.echo(f"Warning: Could not find {install_script}", err=True)
+            click.echo("Please run: ~/dotfiles/genai/hooks/install-hooks.sh", err=True)
+            return
+
+        result = subprocess.run([str(install_script)], capture_output=False)
+        if result.returncode != 0:
+            click.echo("Warning: Hook installation may have failed", err=True)
+        else:
+            click.echo("")
+
+
 def cmd_init() -> None:
-    """Create .work.toml config file."""
+    """Create .work.toml config file and ensure hooks are installed."""
+    # First ensure global hooks are installed
+    ensure_hooks_installed()
+
     repo_root = get_repo_root()
     if not repo_root:
         raise click.ClickException("Not in a git repository")
