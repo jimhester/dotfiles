@@ -3,6 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "click>=8.0",
+#     "tomli>=2.0",
 # ]
 # ///
 """
@@ -54,6 +55,56 @@ class Config:
 
 
 config = Config()
+
+
+@dataclass
+class WorkConfig:
+    """Project-specific work configuration from .work.toml."""
+    worker_guidelines: str = ""
+    review_guidelines: str = ""
+    review_strictness: str = "normal"  # "strict", "normal", "lenient"
+    require_pre_merge_review: bool = True
+
+
+def load_work_config() -> WorkConfig:
+    """Load .work.toml from repo root if it exists."""
+    import tomli
+
+    repo_root = get_repo_root()
+    if not repo_root:
+        return WorkConfig()
+
+    for name in [".work.toml", "work.toml"]:
+        config_path = repo_root / name
+        if config_path.exists():
+            try:
+                with open(config_path, "rb") as f:
+                    data = tomli.load(f)
+                return WorkConfig(
+                    worker_guidelines=data.get("worker_guidelines", ""),
+                    review_guidelines=data.get("review_guidelines", ""),
+                    review_strictness=data.get("review_strictness", "normal"),
+                    require_pre_merge_review=data.get("require_pre_merge_review", True),
+                )
+            except Exception as e:
+                click.echo(f"Warning: Failed to parse {config_path}: {e}", err=True)
+
+    return WorkConfig()
+
+
+# Default review guidelines (used when not overridden in config)
+DEFAULT_REVIEW_GUIDELINES = """
+Focus on bugs actually introduced by these changes:
+
+1. **Logic errors**: Off-by-one, null/undefined handling, incorrect conditions
+2. **Security**: Injection vulnerabilities, auth bypasses, data exposure
+3. **Resource leaks**: Unclosed files, connections, memory
+4. **Error handling**: Unhandled exceptions, missing validation
+5. **Breaking changes**: Public API modifications without backwards compatibility
+
+Ignore: Style/formatting, pre-existing issues, minor nitpicks.
+"""
+
 
 # Valid stages for worker progress tracking
 VALID_STAGES = [
@@ -658,6 +709,9 @@ def generate_prompt(
 ) -> str:
     """Generate the Claude Code prompt."""
 
+    # Load project config for worker guidelines
+    work_config = load_work_config()
+
     jira_instructions = ""
     jira_phase1_note = ""
     if jira_key:
@@ -667,6 +721,11 @@ def generate_prompt(
 - Review the issue description, acceptance criteria, and any comments
 """
         jira_phase1_note = " - fetch JIRA issue details using MCP tools"
+
+    # Build worker guidelines section if configured
+    worker_guidelines_section = ""
+    if work_config.worker_guidelines.strip():
+        worker_guidelines_section = f"\n{work_config.worker_guidelines}"
 
     return f"""Complete this task end-to-end: {task_ref}
 
@@ -683,8 +742,16 @@ def generate_prompt(
 6. Commit your changes with descriptive commit messages
 
 ### Phase 2: Pull Request
-1. Push your branch and open a PR using `{gh_cli} pr create`
-2. Link the PR to the issue if applicable
+1. **Run self-review before creating PR (REQUIRED):**
+   ```bash
+   work --review
+   ```
+   This reviews your changes and blocks if issues are found.
+   - If issues found: fix them, commit, and run `work --review` again
+   - Only proceed to PR creation after review passes
+
+2. Push your branch and open a PR using `{gh_cli} pr create`
+3. Link the PR to the issue if applicable
 
 ### Phase 3: CI & Review Loop
 Repeat until the PR is ready to merge:
@@ -702,10 +769,14 @@ Prerequisites before merging:
 - CI checks must pass
 - At least one reviewer must have APPROVED the PR (not just "Requested")
 - No reviews with "REQUEST_CHANGES" status remain unaddressed
+- **Self-review must pass:**
+  ```bash
+  work --review --pre-merge
+  ```
 
 If reviewers are assigned but haven't reviewed yet, WAIT for their review. Do NOT merge PRs that only show "Requested" reviewers with no actual approvals.
 
-Once you have approval:
+Once you have approval and self-review passes:
 1. Merge the PR using `{gh_cli} pr merge <PR-NUMBER> --squash`
 2. Confirm the merge succeeded
 
@@ -756,7 +827,7 @@ Then output a summary including:
   work --messages  # Uses WORK_WORKER_ID from environment
   ```
   Messages may contain priority changes, additional context, or instructions.
-"""
+{worker_guidelines_section}"""
 
 
 # =============================================================================
@@ -779,9 +850,13 @@ Then output a summary including:
 @click.option('--event', 'log_event', nargs=2, help='Log an event (type, message)')
 @click.option('--transition', nargs=3, help='Transition status, phase, stage')
 @click.option('--type', 'msg_type', default='info', help='Message type for --send')
+@click.option('--init', 'do_init', is_flag=True, help='Create .work.toml config file')
+@click.option('--review', 'do_review', is_flag=True, help='Run self-review of changes')
+@click.option('--pre-merge', 'pre_merge', is_flag=True, help='Use stricter pre-merge review (with --review)')
 @click.pass_context
 def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send,
-        show_messages, peek, set_stage, mark_done, set_pr, log_event, transition, msg_type):
+        show_messages, peek, set_stage, mark_done, set_pr, log_event, transition, msg_type,
+        do_init, do_review, pre_merge):
     """
     Start Claude Code session(s) for GitHub issue(s) or JIRA tickets.
 
@@ -792,6 +867,12 @@ def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send
       work --here 42 "fix memory leak"  # Run in current terminal
       work "add dark mode support"      # New feature branch
       work AIE-123                       # JIRA issue
+
+    \b
+    Config & Review:
+      work --init                      # Create .work.toml config file
+      work --review                    # Run self-review before PR
+      work --review --pre-merge        # Run self-review before merge
 
     \b
     Worker Management:
@@ -807,6 +888,15 @@ def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send
       work --pr <number> <url> [issue] # Register PR for worker
       work --event <type> <msg> [issue] # Log an event
     """
+
+    # Handle init and review commands
+    if do_init:
+        cmd_init()
+        return
+
+    if do_review:
+        cmd_review(pre_merge)
+        return
 
     # Handle management commands
     if show_status:
@@ -888,6 +978,161 @@ def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send
                 time.sleep(config.spawn_delay)
             spawn_in_new_tab(issue)
             click.echo(f"Spawned worker for: {issue}")
+
+
+# =============================================================================
+# Init and Review Commands
+# =============================================================================
+
+INIT_TEMPLATE = '''\
+# .work.toml - Work agent configuration
+# See: https://github.com/jimhester/dotfiles/blob/main/genai/work
+
+# Additional instructions appended to the worker prompt.
+# Customize for your project's specific conventions.
+worker_guidelines = """
+## Project-Specific Guidelines
+
+# Examples (uncomment and modify as needed):
+# - Run `make lint` before committing
+# - Use conventional commit messages (feat:, fix:, docs:, etc.)
+# - Update CHANGELOG.md for user-facing changes
+"""
+
+# Custom review guidelines for self-review.
+# If empty, uses sensible defaults.
+review_guidelines = """
+## Code Review Guidelines
+
+Focus on bugs actually introduced by these changes:
+
+# Add project-specific checks here, for example:
+# - Check for integer overflow in size calculations
+# - Verify thread safety of shared data structures
+# - Ensure proper error handling for I/O operations
+
+### Ignore
+- Style/formatting (handled by formatters)
+- Pre-existing issues not introduced by this commit
+- Minor nitpicks
+"""
+
+# Review strictness: "strict", "normal", or "lenient"
+# - strict: Flag anything that could potentially be an issue
+# - normal: Balanced (default)
+# - lenient: Only flag clear, obvious bugs
+review_strictness = "normal"
+
+# Whether to require review before merge (in addition to before PR)
+require_pre_merge_review = true
+'''
+
+
+def cmd_init() -> None:
+    """Create .work.toml config file."""
+    repo_root = get_repo_root()
+    if not repo_root:
+        raise click.ClickException("Not in a git repository")
+
+    config_path = repo_root / ".work.toml"
+
+    if config_path.exists():
+        if not click.confirm(f"{config_path} already exists. Overwrite?"):
+            click.echo("Aborted.")
+            return
+
+    config_path.write_text(INIT_TEMPLATE)
+    click.echo(f"Created {config_path}")
+    click.echo("Customize worker_guidelines and review_guidelines for your project.")
+
+
+def cmd_review(pre_merge: bool = False) -> None:
+    """Run self-review of changes."""
+    # Load project config
+    work_config = load_work_config()
+
+    # Check if pre-merge review is required
+    if pre_merge and not work_config.require_pre_merge_review:
+        click.echo("Pre-merge review not required (disabled in .work.toml)")
+        sys.exit(0)
+
+    # Get diff
+    diff_cmd = ["git", "diff", "origin/main...HEAD"]
+    result = subprocess.run(diff_cmd, capture_output=True, text=True)
+    if result.returncode != 0 or not result.stdout.strip():
+        click.echo("No changes to review.")
+        sys.exit(0)
+
+    diff = result.stdout
+
+    # Load CLAUDE.md for project context
+    claude_md = ""
+    repo_root = get_repo_root()
+    if repo_root:
+        claude_md_path = repo_root / "CLAUDE.md"
+        if claude_md_path.exists():
+            claude_md = claude_md_path.read_text()[:4000]  # Truncate if huge
+
+    # Use custom or default review guidelines
+    review_guidelines = work_config.review_guidelines.strip() or DEFAULT_REVIEW_GUIDELINES
+
+    # Adjust for strictness
+    strictness_note = ""
+    if work_config.review_strictness == "strict":
+        strictness_note = "\n\nBe thorough - flag anything that could potentially cause issues."
+    elif work_config.review_strictness == "lenient":
+        strictness_note = "\n\nOnly flag clear, obvious bugs. Skip uncertain or minor issues."
+
+    # Build review prompt
+    review_type = "pre-merge" if pre_merge else "pre-PR"
+    pre_merge_note = "\n## Pre-Merge Check\nBe extra thorough - this is the final check before merge." if pre_merge else ""
+
+    prompt = f"""You are reviewing code changes before {"merging" if pre_merge else "opening a PR"}.
+
+## Project Context
+{claude_md if claude_md else "(No CLAUDE.md found)"}
+
+## Review Guidelines
+{review_guidelines}
+{strictness_note}
+{pre_merge_note}
+
+## Output Format
+If issues found, list each as:
+- [HIGH/MEDIUM/LOW] file:line - description
+
+If no issues: Output exactly "APPROVED" on its own line.
+
+## Diff to Review
+```diff
+{diff}
+```
+"""
+
+    # Run claude --print for synchronous review
+    click.echo(f"Running {review_type} review...")
+    result = subprocess.run(
+        ["claude", "--print", "-p", prompt],
+        capture_output=True, text=True
+    )
+
+    output = result.stdout
+    click.echo(output)
+
+    # Write marker file (in repo root so it persists and hook can find it)
+    if repo_root:
+        marker_path = repo_root / ".work-review-status"
+        marker_path.write_text(output)
+        # Also set env var for current session (hook may use this)
+        os.environ["WORK_REVIEW_MARKER"] = str(marker_path)
+
+    # Check result
+    if "APPROVED" in output:
+        click.echo("✅ Review passed!")
+        sys.exit(0)
+    else:
+        click.echo("❌ Review found issues. Please address them.")
+        sys.exit(1)
 
 
 def cmd_status():
