@@ -854,10 +854,11 @@ Then output a summary including:
 @click.option('--review', 'do_review', is_flag=True, help='Run self-review of changes')
 @click.option('--pre-merge', 'pre_merge', is_flag=True, help='Use stricter pre-merge review (with --review)')
 @click.option('--dry-run', 'dry_run', type=click.Choice(['pass', 'fail']), help='Test review without calling Claude (pass/fail)')
+@click.option('--reviews', 'show_reviews', is_flag=True, help='Show review history for a commit')
 @click.pass_context
 def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send,
         show_messages, peek, set_stage, mark_done, set_pr, log_event, transition, msg_type,
-        do_init, do_review, pre_merge, dry_run):
+        do_init, do_review, pre_merge, dry_run, show_reviews):
     """
     Start Claude Code session(s) for GitHub issue(s) or JIRA tickets.
 
@@ -874,6 +875,7 @@ def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send
       work --init                      # Create .work.toml config file
       work --review                    # Run self-review before PR
       work --review --pre-merge        # Run self-review before merge
+      work --reviews [ref]             # Show review history (default: HEAD)
 
     \b
     Worker Management:
@@ -897,6 +899,11 @@ def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send
 
     if do_review:
         cmd_review(pre_merge, dry_run)
+        return
+
+    if show_reviews:
+        ref = issues[0] if issues else "HEAD"
+        cmd_reviews(ref)
         return
 
     # Handle management commands
@@ -1219,6 +1226,34 @@ Commit: {head_sha[:8]}
     else:
         click.echo("❌ Review found issues. Please address them.")
         sys.exit(1)
+
+
+def cmd_reviews(ref: str = "HEAD") -> None:
+    """Show review history for a commit."""
+    # Resolve the ref to a commit
+    result = subprocess.run(
+        ["git", "rev-parse", ref],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        raise click.ClickException(f"Invalid git ref: {ref}")
+
+    commit = result.stdout.strip()
+    short_commit = commit[:8]
+
+    # Get the review note
+    result = subprocess.run(
+        ["git", "notes", "--ref=reviews", "show", commit],
+        capture_output=True, text=True
+    )
+
+    if result.returncode != 0:
+        click.echo(f"No review found for {ref} ({short_commit})")
+        return
+
+    click.echo(f"Review for {ref} ({short_commit}):")
+    click.echo("-" * 60)
+    click.echo(result.stdout)
 
 
 def cmd_status():
