@@ -852,6 +852,7 @@ Then output a summary including:
 @click.option('--transition', nargs=3, help='Transition status, phase, stage')
 @click.option('--type', 'msg_type', default='info', help='Message type for --send')
 @click.option('--init', 'do_init', is_flag=True, help='Create .work.toml config file')
+@click.option('--no-ai', 'no_ai', is_flag=True, help='Skip AI generation when using --init')
 @click.option('--review', 'do_review', is_flag=True, help='Run self-review of changes')
 @click.option('--pre-merge', 'pre_merge', is_flag=True, help='Use stricter pre-merge review (with --review)')
 @click.option('--dry-run', 'dry_run', type=click.Choice(['pass', 'fail']), help='Test review without calling Claude (pass/fail)')
@@ -859,7 +860,7 @@ Then output a summary including:
 @click.pass_context
 def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send,
         show_messages, peek, set_stage, mark_done, set_pr, log_event, transition, msg_type,
-        do_init, do_review, pre_merge, dry_run, show_reviews):
+        do_init, no_ai, do_review, pre_merge, dry_run, show_reviews):
     """
     Start Claude Code session(s) for GitHub issue(s) or JIRA tickets.
 
@@ -873,7 +874,8 @@ def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send
 
     \b
     Config & Review:
-      work --init                      # Create .work.toml config file
+      work --init                      # Create .work.toml (auto-generates from CLAUDE.md)
+      work --init --no-ai              # Create .work.toml without AI generation
       work --review                    # Run self-review before PR
       work --review --pre-merge        # Run self-review before merge
       work --reviews [ref]             # Show review history (default: HEAD)
@@ -895,7 +897,7 @@ def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send
 
     # Handle init and review commands
     if do_init:
-        cmd_init()
+        cmd_init(no_ai=no_ai)
         return
 
     if do_review:
@@ -1086,7 +1088,77 @@ def ensure_hooks_installed() -> None:
             click.echo("")
 
 
-def cmd_init() -> None:
+def generate_guidelines_from_claude_md(claude_md_content: str) -> Optional[dict]:
+    """Generate project-specific guidelines from CLAUDE.md using Claude."""
+    prompt = f"""Analyze this CLAUDE.md file and generate project-specific guidelines for a work agent.
+
+Output a valid TOML configuration with two multi-line string fields. Use triple quotes for multi-line strings.
+Do NOT include any markdown code fences or explanation - output ONLY the raw TOML content.
+
+## Required Fields
+
+1. `worker_guidelines` - Instructions for an AI agent working on issues in this repo. Include:
+   - GitHub CLI to use (gh vs ghe for enterprise)
+   - Development commands (install, test, lint, build, type check)
+   - Validation order before committing
+   - Project-specific conventions or patterns
+   - Required documentation standards
+   - Issue labels for follow-up work
+
+2. `review_guidelines` - Checklist for self-reviewing code changes. Include:
+   - Project-specific code review checks
+   - Common pitfalls to watch for
+   - What to ignore (formatting, pre-existing issues)
+
+## CLAUDE.md Content
+
+{claude_md_content}
+
+## Output Format
+
+Output ONLY valid TOML like this (no markdown fences, no explanation):
+
+worker_guidelines = \"\"\"
+## Project-Specific Guidelines
+...content...
+\"\"\"
+
+review_guidelines = \"\"\"
+## Code Review Guidelines
+...content...
+\"\"\""""
+
+    try:
+        result = subprocess.run(
+            ["claude", "--print", "-p", prompt],
+            capture_output=True, text=True,
+            stdin=subprocess.DEVNULL,
+            timeout=120
+        )
+        if result.returncode != 0:
+            return None
+
+        output = result.stdout.strip()
+
+        # Strip markdown code fences if present
+        if output.startswith("```"):
+            lines = output.split("\n")
+            # Remove first line (```toml or ```)
+            lines = lines[1:]
+            # Remove last line if it's ```
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            output = "\n".join(lines)
+
+        # Parse TOML output
+        import tomli
+        return tomli.loads(output)
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, Exception) as e:
+        click.echo(f"Warning: Failed to generate guidelines: {e}", err=True)
+        return None
+
+
+def cmd_init(no_ai: bool = False) -> None:
     """Create .work.toml config file and ensure hooks are installed."""
     # First ensure global hooks are installed
     ensure_hooks_installed()
@@ -1102,9 +1174,54 @@ def cmd_init() -> None:
             click.echo("Aborted.")
             return
 
-    config_path.write_text(INIT_TEMPLATE)
-    click.echo(f"Created {config_path}")
-    click.echo("Customize worker_guidelines and review_guidelines for your project.")
+    # Check for CLAUDE.md and generate guidelines if available
+    claude_md_path = repo_root / "CLAUDE.md"
+    generated = None
+
+    if not no_ai and claude_md_path.exists():
+        click.echo("Found CLAUDE.md - generating project-specific guidelines...")
+        claude_md_content = claude_md_path.read_text()
+        # Truncate if very large
+        if len(claude_md_content) > 15000:
+            claude_md_content = claude_md_content[:15000] + "\n...(truncated)"
+        generated = generate_guidelines_from_claude_md(claude_md_content)
+
+    if generated:
+        # Build config with generated guidelines
+        worker_guidelines = generated.get("worker_guidelines", "").strip()
+        review_guidelines = generated.get("review_guidelines", "").strip()
+
+        config_content = f'''# .work.toml - Work agent configuration
+# See: https://github.com/jimhester/dotfiles/blob/main/genai/work
+# Generated from CLAUDE.md
+
+# Additional instructions appended to the worker prompt.
+worker_guidelines = """
+{worker_guidelines}
+"""
+
+# Custom review guidelines for self-review.
+review_guidelines = """
+{review_guidelines}
+"""
+
+# Review strictness: "strict", "normal", or "lenient"
+# - strict: Flag anything that could potentially be an issue
+# - normal: Balanced (default)
+# - lenient: Only flag clear, obvious bugs
+review_strictness = "normal"
+
+# Whether to require review before merge (in addition to before PR)
+require_pre_merge_review = true
+'''
+        config_path.write_text(config_content)
+        click.echo(f"Created {config_path} with project-specific guidelines from CLAUDE.md")
+    else:
+        if not no_ai and claude_md_path.exists():
+            click.echo("Could not generate guidelines, using template instead.")
+        config_path.write_text(INIT_TEMPLATE)
+        click.echo(f"Created {config_path}")
+        click.echo("Customize worker_guidelines and review_guidelines for your project.")
 
 
 def cmd_review(pre_merge: bool = False, dry_run: Optional[str] = None) -> None:
