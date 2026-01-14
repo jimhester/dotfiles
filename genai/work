@@ -853,10 +853,11 @@ Then output a summary including:
 @click.option('--init', 'do_init', is_flag=True, help='Create .work.toml config file')
 @click.option('--review', 'do_review', is_flag=True, help='Run self-review of changes')
 @click.option('--pre-merge', 'pre_merge', is_flag=True, help='Use stricter pre-merge review (with --review)')
+@click.option('--dry-run', 'dry_run', type=click.Choice(['pass', 'fail']), help='Test review without calling Claude (pass/fail)')
 @click.pass_context
 def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send,
         show_messages, peek, set_stage, mark_done, set_pr, log_event, transition, msg_type,
-        do_init, do_review, pre_merge):
+        do_init, do_review, pre_merge, dry_run):
     """
     Start Claude Code session(s) for GitHub issue(s) or JIRA tickets.
 
@@ -895,7 +896,7 @@ def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send
         return
 
     if do_review:
-        cmd_review(pre_merge)
+        cmd_review(pre_merge, dry_run)
         return
 
     # Handle management commands
@@ -1098,7 +1099,7 @@ def cmd_init() -> None:
     click.echo("Customize worker_guidelines and review_guidelines for your project.")
 
 
-def cmd_review(pre_merge: bool = False) -> None:
+def cmd_review(pre_merge: bool = False, dry_run: Optional[str] = None) -> None:
     """Run self-review of changes."""
     # Load project config
     work_config = load_work_config()
@@ -1161,15 +1162,48 @@ If no issues: Output exactly "APPROVED" on its own line.
 ```
 """
 
-    # Run claude --print for synchronous review
+    # Run claude --print for synchronous review (or use mock for dry-run)
     click.echo(f"Running {review_type} review...")
-    result = subprocess.run(
-        ["claude", "--print", "-p", prompt],
-        capture_output=True, text=True
-    )
 
-    output = result.stdout
+    if dry_run:
+        click.echo(f"[DRY-RUN MODE: simulating '{dry_run}']")
+        if dry_run == "pass":
+            output = "No issues found in the code changes.\n\nAPPROVED"
+        else:
+            output = "- [HIGH] example.py:42 - Potential null pointer dereference\n- [MEDIUM] utils.py:10 - Missing error handling"
+    else:
+        result = subprocess.run(
+            ["claude", "--print", "-p", prompt],
+            capture_output=True, text=True
+        )
+        output = result.stdout
+
     click.echo(output)
+
+    # Determine if review passed (case-insensitive check)
+    passed = "APPROVED" in output.upper()
+
+    # Store review as git note for debugging/history
+    head_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True, text=True
+    ).stdout.strip()
+
+    if head_sha:
+        timestamp = datetime.now().isoformat()
+        status = "APPROVED" if passed else "ISSUES_FOUND"
+        note_content = f"""[{review_type} review] {timestamp}
+Status: {status}
+Commit: {head_sha[:8]}
+
+{output}
+"""
+        # Use refs/notes/reviews namespace to avoid conflicts
+        subprocess.run(
+            ["git", "notes", "--ref=reviews", "add", "-f", "-m", note_content, "HEAD"],
+            capture_output=True
+        )
+        click.echo(f"Review stored as git note (view with: git notes --ref=reviews show HEAD)")
 
     # Write marker file (in repo root so it persists and hook can find it)
     if repo_root:
@@ -1179,7 +1213,7 @@ If no issues: Output exactly "APPROVED" on its own line.
         os.environ["WORK_REVIEW_MARKER"] = str(marker_path)
 
     # Check result
-    if "APPROVED" in output:
+    if passed:
         click.echo("✅ Review passed!")
         sys.exit(0)
     else:

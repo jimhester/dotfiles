@@ -80,8 +80,8 @@ EOF
     exit 0
 fi
 
-# Check if review passed
-if ! grep -q "APPROVED" "$REVIEW_MARKER" 2>/dev/null; then
+# Check if review passed (case-insensitive)
+if ! grep -qi "APPROVED" "$REVIEW_MARKER" 2>/dev/null; then
     cat << EOF
 {"decision": "block", "reason": "Last review found issues"}
 EOF
