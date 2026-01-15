@@ -1193,6 +1193,28 @@ review_guidelines = \"\"\"
         return None
 
 
+def ensure_gitignore_entry(repo_root: Path, entry: str) -> bool:
+    """Add an entry to .gitignore if not already present. Returns True if added."""
+    gitignore_path = repo_root / ".gitignore"
+
+    # Check if entry already exists
+    if gitignore_path.exists():
+        content = gitignore_path.read_text()
+        if entry in content.splitlines():
+            return False
+
+    # Add entry to .gitignore
+    with open(gitignore_path, "a") as f:
+        # Add newline before entry if file doesn't end with one
+        if gitignore_path.exists():
+            content = gitignore_path.read_text()
+            if content and not content.endswith("\n"):
+                f.write("\n")
+        f.write(f"\n# Work tool temporary files\n{entry}\n")
+
+    return True
+
+
 def cmd_init(no_ai: bool = False) -> None:
     """Create .work.toml config file and ensure hooks are installed."""
     # First ensure global hooks are installed
@@ -1201,6 +1223,10 @@ def cmd_init(no_ai: bool = False) -> None:
     repo_root = get_repo_root()
     if not repo_root:
         raise click.ClickException("Not in a git repository")
+
+    # Ensure .work-review-status is in .gitignore
+    if ensure_gitignore_entry(repo_root, ".work-review-status"):
+        click.echo("Added .work-review-status to .gitignore")
 
     config_path = repo_root / ".work.toml"
 
