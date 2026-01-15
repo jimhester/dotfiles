@@ -2,7 +2,8 @@
 # work-stage-detector.sh - Claude Code hook for auto-detecting work stage transitions
 #
 # This PostToolUse hook detects workflow events from Bash commands and updates
-# the worker's stage via the work CLI. It supports:
+# the worker's stage via the work CLI. It also checks for pending messages after
+# every command to ensure timely delivery. It supports:
 #
 #   Event                    | Resulting Stage
 #   -------------------------|----------------
@@ -10,6 +11,9 @@
 #   CI passes (gh pr checks) | review_waiting
 #   gh pr merge              | done
 #   Merge/rebase conflicts   | merge_conflicts
+#
+# Additionally, after every Bash command, it checks for and displays any pending
+# messages sent to this worker via `work --send`.
 
 set -euo pipefail
 
@@ -53,11 +57,9 @@ if [[ "$COMMAND" =~ gh[e]?[[:space:]]+pr[[:space:]]+create ]] && [[ "$EXIT_CODE"
             "$WORK_SCRIPT" --pr "$PR_NUMBER" "$PR_URL" >/dev/null 2>&1 || true
         fi
     fi
-    exit 0
-fi
 
 # Detect CI check results: gh pr checks
-if [[ "$COMMAND" =~ gh[e]?[[:space:]]+pr[[:space:]]+checks ]]; then
+elif [[ "$COMMAND" =~ gh[e]?[[:space:]]+pr[[:space:]]+checks ]]; then
     # Check if watching (--watch flag)
     if [[ "$COMMAND" =~ --watch ]]; then
         # For --watch, we need to check the final status
@@ -77,32 +79,29 @@ if [[ "$COMMAND" =~ gh[e]?[[:space:]]+pr[[:space:]]+checks ]]; then
             fi
         fi
     fi
-    exit 0
-fi
 
 # Detect PR merge: gh pr merge
-if [[ "$COMMAND" =~ gh[e]?[[:space:]]+pr[[:space:]]+merge ]] && [[ "$EXIT_CODE" == "0" ]]; then
+elif [[ "$COMMAND" =~ gh[e]?[[:space:]]+pr[[:space:]]+merge ]] && [[ "$EXIT_CODE" == "0" ]]; then
     # Check if merge was successful from output
     if echo "$RESPONSE" | grep -qiE '(merged|successfully)'; then
         "$WORK_SCRIPT" --transition "merged" "follow_up" "done" "pr_merged" "PR merged successfully" >/dev/null 2>&1 || true
     fi
-    exit 0
-fi
 
 # Detect resolved conflicts: git rebase --continue or git merge --continue
 # NOTE: This must come BEFORE the conflict detection check since both match git rebase/merge
-if [[ "$COMMAND" =~ git[[:space:]]+(rebase|merge)[[:space:]]+--continue ]] && [[ "$EXIT_CODE" == "0" ]]; then
+elif [[ "$COMMAND" =~ git[[:space:]]+(rebase|merge)[[:space:]]+--continue ]] && [[ "$EXIT_CODE" == "0" ]]; then
     # Transition back to implementing (CLI handles the state check)
     "$WORK_SCRIPT" --transition "running" "implementation" "implementing" "conflict_resolved" "Merge conflicts resolved" >/dev/null 2>&1 || true
-    exit 0
-fi
 
 # Detect merge conflicts from git rebase or git merge
-if [[ "$COMMAND" =~ git[[:space:]]+(rebase|merge|pull) ]]; then
+elif [[ "$COMMAND" =~ git[[:space:]]+(rebase|merge|pull) ]]; then
     if echo "$RESPONSE" | grep -qiE '(CONFLICT|conflict|Automatic merge failed)'; then
         "$WORK_SCRIPT" --transition "merge_conflicts" "blocked" "merge_conflicts" "conflict_detected" "Merge conflict detected" >/dev/null 2>&1 || true
     fi
-    exit 0
 fi
+
+# Check for pending messages and display them
+# This ensures workers receive messages in a timely manner
+"$WORK_SCRIPT" --messages --quiet 2>&1 || true
 
 exit 0

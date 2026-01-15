@@ -843,10 +843,8 @@ Then output a summary including:
 - Keep PR description updated with significant changes
 - Follow any project-specific guidelines in CLAUDE.md
 - If blocked by external factors (permissions, unclear requirements), explain and stop
-- **Check for messages**: Periodically check for messages from the parent session:
-  ```bash
-  work --messages  # Uses WORK_WORKER_ID from environment
-  ```
+- **Messages**: Messages from the parent session are automatically displayed after each
+  command via hooks. You can also manually check with `work --messages` if needed.
   Messages may contain priority changes, additional context, or instructions.
 {worker_guidelines_section}"""
 
@@ -865,6 +863,7 @@ Then output a summary including:
 @click.option('--send', 'do_send', is_flag=True, help='Send a message to a worker')
 @click.option('--messages', 'show_messages', is_flag=True, help='View pending messages')
 @click.option('--peek', is_flag=True, help='View messages without marking as read')
+@click.option('--quiet', is_flag=True, help='Suppress output when no messages (for hooks)')
 @click.option('--stage', 'set_stage', help='Set worker stage')
 @click.option('--done', 'mark_done', is_flag=True, help='Mark worker as done')
 @click.option('--pr', 'set_pr', nargs=2, help='Register PR number and URL')
@@ -879,7 +878,7 @@ Then output a summary including:
 @click.option('--reviews', 'show_reviews', is_flag=True, help='Show review history for a commit')
 @click.pass_context
 def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send,
-        show_messages, peek, set_stage, mark_done, set_pr, log_event, transition, msg_type,
+        show_messages, peek, quiet, set_stage, mark_done, set_pr, log_event, transition, msg_type,
         do_init, no_ai, do_review, pre_merge, dry_run, show_reviews):
     """
     Start Claude Code session(s) for GitHub issue(s) or JIRA tickets.
@@ -959,7 +958,7 @@ def cli(ctx, issues, here, show_status, show_events, show_logs, do_stop, do_send
 
     if show_messages:
         issue = issues[0] if issues else None
-        cmd_messages(issue, peek)
+        cmd_messages(issue, peek, quiet)
         return
 
     if set_stage:
@@ -1589,7 +1588,7 @@ def cmd_send(issue: str, message: str, msg_type: str = "info"):
     click.echo(f"Message sent to worker for: {issue}")
 
 
-def cmd_messages(issue: Optional[str] = None, peek: bool = False):
+def cmd_messages(issue: Optional[str] = None, peek: bool = False, quiet: bool = False):
     """View pending messages for a worker."""
     init_db()
 
@@ -1604,13 +1603,16 @@ def cmd_messages(issue: Optional[str] = None, peek: bool = False):
             worker_id = int(worker_id)
 
     if not worker_id:
+        if quiet:
+            return  # Silently exit in quiet mode if no worker ID
         raise click.ClickException(
             "No worker specified. Provide an issue argument or set WORK_WORKER_ID."
         )
 
     count = db_get_message_count(worker_id)
     if count == 0:
-        click.echo("No unread messages.")
+        if not quiet:
+            click.echo("No unread messages.")
         return
 
     click.echo(f"Unread Messages ({count}):")
@@ -1621,10 +1623,11 @@ def cmd_messages(issue: Optional[str] = None, peek: bool = False):
         click.echo(f"[{msg['created_at']}] ({msg['message_type']}) {msg['payload']}")
 
     click.echo("-" * 79)
-    if not peek:
-        click.echo("All messages marked as read.")
-    else:
-        click.echo("(Peek mode - messages NOT marked as read)")
+    if not quiet:
+        if not peek:
+            click.echo("All messages marked as read.")
+        else:
+            click.echo("(Peek mode - messages NOT marked as read)")
 
 
 def cmd_stage(stage: str, issue: Optional[str] = None):
