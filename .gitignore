@@ -80,3 +80,5 @@ vignettes/*.pdf
 # End of https://www.gitignore.io/api/r
 .clangd
 compile_commands.json
+# Cloned work repo (managed separately)
+work/

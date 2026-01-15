@@ -72,7 +72,7 @@ make_link ~/.dir_colors "$DOTFILES_DIR/dircolors/dircolors.ansi-light"
 make_link ~/.colemak "$DOTFILES_DIR/colemak/"
 
 # Clone work repo for Claude Code tooling
-WORK_REPO="$HOME/work"
+WORK_REPO="$DOTFILES_DIR/work"
 if [[ ! -d "$WORK_REPO" ]]; then
     echo "Cloning work repo..."
     git clone https://github.com/jimhester/work.git "$WORK_REPO"
