@@ -71,14 +71,23 @@ make_link ~/.dir_colors "$DOTFILES_DIR/dircolors/dircolors.ansi-light"
 # Make colemak directory link
 make_link ~/.colemak "$DOTFILES_DIR/colemak/"
 
+# Clone work repo for Claude Code tooling
+WORK_REPO="$HOME/work"
+if [[ ! -d "$WORK_REPO" ]]; then
+    echo "Cloning work repo..."
+    git clone https://github.com/jimhester/work.git "$WORK_REPO"
+else
+    echo "Work repo already exists at $WORK_REPO"
+fi
+
 # Work script for Claude Code
-make_link ~/.local/bin/work "$DOTFILES_DIR/genai/work"
+make_link ~/.local/bin/work "$WORK_REPO/work"
 
 # Claude Code skills
-make_link ~/.claude/skills/work "$DOTFILES_DIR/genai/skills/work"
+make_link ~/.claude/skills/work "$WORK_REPO/skills/work"
 
 # Claude Code hooks for auto-detecting work stages
-"$DOTFILES_DIR/genai/hooks/install-hooks.sh"
+"$WORK_REPO/hooks/install-hooks.sh"
 
 # Git config
 git config --global core.excludesfile "$DOTFILES_DIR/.gitignore"
