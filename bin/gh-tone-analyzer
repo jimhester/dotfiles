@@ -1,24 +1,22 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["nltk"]
+# ///
 """Sample a user's GitHub comments from a repository and sort them by tone.
 
-Uses the `gh` CLI for authenticated GitHub API access and a hybrid tone
-classifier combining VADER sentiment analysis (for polarity: positive,
-neutral, critical) with keyword heuristics (for intent: constructive,
-inquisitive, urgent).
+Uses the `gh` CLI for authenticated GitHub API access and NLTK's VADER
+sentiment analyzer for tone classification.  VADER understands negation
+("not great"), intensifiers ("EXTREMELY good"), capitalization, punctuation
+emphasis ("nice!!!"), and emoji.
 
-Install the optional dependency for best results:
-    pip install nltk
-    python -c "import nltk; nltk.download('vader_lexicon')"
-
-Falls back to pure keyword matching if nltk is not available.
-
-Usage:
-    gh-tone-analyzer owner/repo [--user USER] [--limit N] [--verbose]
+Run with uv (dependencies are resolved automatically):
+    uv run gh-tone-analyzer owner/repo [--user USER] [--limit N] [--verbose]
 
 Examples:
-    gh-tone-analyzer tidyverse/dplyr --user hadley
-    gh-tone-analyzer rust-lang/rust --user dtolnay --limit 50
-    gh-tone-analyzer myorg/myrepo --verbose
+    uv run gh-tone-analyzer tidyverse/dplyr --user hadley
+    uv run gh-tone-analyzer rust-lang/rust --user dtolnay --limit 50
+    uv run gh-tone-analyzer myorg/myrepo --verbose
 """
 
 import argparse
@@ -28,172 +26,32 @@ import subprocess
 import sys
 import textwrap
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-try:
-    from nltk.sentiment.vader import SentimentIntensityAnalyzer
-    _vader = SentimentIntensityAnalyzer()
-    HAS_VADER = True
-except (ImportError, LookupError):
-    _vader = None
-    HAS_VADER = False
+import nltk
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+
+nltk.download("vader_lexicon", quiet=True)
+_vader = SentimentIntensityAnalyzer()
 
 # -- Tone definitions --------------------------------------------------------
 
-TONE_PATTERNS = {
-    "positive": {
-        "weight": 1.0,
-        "description": "Appreciative, encouraging, or agreeable",
-        "patterns": [
-            (r"\bthanks?\b", 1.5),
-            (r"\bthank\s+you\b", 2.0),
-            (r"\bgreat\b", 1.0),
-            (r"\bawesome\b", 1.2),
-            (r"\blgtm\b", 2.0),
-            (r"\blooks?\s+good\b", 1.5),
-            (r"\bnice\b", 1.0),
-            (r"\blove\b", 1.0),
-            (r"\bwell\s+done\b", 1.5),
-            (r"\bexcellent\b", 1.2),
-            (r"\bperfect\b", 1.0),
-            (r"\bamazing\b", 1.2),
-            (r"\bfantastic\b", 1.2),
-            (r"\b\+1\b", 1.5),
-            (r"\bagree\b", 1.0),
-            (r"\bhelpful\b", 1.0),
-            (r"\bbrilliant\b", 1.2),
-            (r"\bsolid\b", 0.8),
-            (r"\bclean\b", 0.8),
-            (r"\belegant\b", 1.0),
-            (r"👍|🎉|❤️|🚀|💯", 1.5),
-        ],
-    },
-    "constructive": {
-        "weight": 1.0,
-        "description": "Suggestions, improvements, or alternatives",
-        "patterns": [
-            (r"\bconsider\b", 1.5),
-            (r"\bsuggest\b", 1.5),
-            (r"\bmight\s+want\b", 1.2),
-            (r"\bcould\s+(we|you|this|it)\b", 1.2),
-            (r"\bmaybe\b", 1.0),
-            (r"\bwhat\s+about\b", 1.2),
-            (r"\bhow\s+about\b", 1.2),
-            (r"\balternative(ly)?\b", 1.2),
-            (r"\binstead\b", 1.0),
-            (r"\bprefer\b", 1.0),
-            (r"\bwould\s+be\s+(better|nicer|cleaner)\b", 1.5),
-            (r"\bnit(pick)?\b", 1.5),
-            (r"\bminor\b", 0.8),
-            (r"\btweaks?\b", 1.0),
-            (r"\bimprove\b", 1.0),
-            (r"\brefactor\b", 1.0),
-            (r"\bsimplif(y|ied)\b", 1.0),
-            (r"\boptional\b", 0.8),
-            (r"\bone\s+option\b", 1.2),
-        ],
-    },
-    "inquisitive": {
-        "weight": 1.0,
-        "description": "Questions, clarifications, or exploration",
-        "patterns": [
-            (r"\?", 1.0),
-            (r"\bwhy\b", 1.0),
-            (r"\bhow\s+(does|do|did|is|are|would|will|can)\b", 1.2),
-            (r"\bwhat\s+(is|are|does|do|did|would|will|if)\b", 1.2),
-            (r"\bwhen\s+(does|do|did|is|should|will)\b", 1.0),
-            (r"\bcould\s+you\s+explain\b", 1.5),
-            (r"\bwondering\b", 1.2),
-            (r"\bcurious\b", 1.2),
-            (r"\bunderstand\b", 0.8),
-            (r"\bclarif(y|ication)\b", 1.5),
-            (r"\bconfused\b", 1.0),
-            (r"\bnot\s+sure\b", 1.0),
-            (r"\bdoes\s+this\b", 1.0),
-            (r"\bis\s+this\b", 0.8),
-            (r"\bis\s+there\b", 0.8),
-        ],
-    },
-    "neutral": {
-        "weight": 0.8,  # slightly lower weight so more specific tones win ties
-        "description": "Factual, informational, or status updates",
-        "patterns": [
-            (r"\bnote\s+that\b", 1.2),
-            (r"\bfyi\b", 1.5),
-            (r"\bfor\s+(your\s+)?(reference|info)\b", 1.2),
-            (r"\bupdated?\b", 1.0),
-            (r"\badded\b", 1.0),
-            (r"\bchanged\b", 1.0),
-            (r"\bfixed\b", 1.0),
-            (r"\bremoved\b", 1.0),
-            (r"\bthis\s+(is|was|will)\b", 0.5),
-            (r"\brelated\s+to\b", 1.0),
-            (r"\bsee\s+(also|#\d+|http)\b", 1.2),
-            (r"\bcc\s+@\b", 1.5),
-            (r"\bref\b", 0.8),
-            (r"\bmerged\b", 1.0),
-            (r"\bclosed\b", 1.0),
-            (r"\brebased\b", 1.0),
-            (r"\baddressed\b", 1.0),
-        ],
-    },
-    "critical": {
-        "weight": 1.0,
-        "description": "Disagreement, concerns, or problem reports",
-        "patterns": [
-            (r"\bwrong\b", 1.5),
-            (r"\bincorrect\b", 1.5),
-            (r"\bbug\b", 1.2),
-            (r"\bissue\b", 0.8),
-            (r"\bproblem\b", 1.0),
-            (r"\bdoesn'?t\s+work\b", 1.5),
-            (r"\bbroken\b", 1.5),
-            (r"\bfail(s|ed|ing|ure)?\b", 1.2),
-            (r"\berror\b", 1.0),
-            (r"\bdisagree\b", 1.5),
-            (r"\bshould\s+not\b", 1.2),
-            (r"\bshouldn'?t\b", 1.2),
-            (r"\bwon'?t\b", 0.8),
-            (r"\bcan'?t\b", 0.8),
-            (r"\bmissing\b", 1.0),
-            (r"\bincomplete\b", 1.2),
-            (r"\bregression\b", 1.5),
-            (r"\bunexpected\b", 1.2),
-            (r"\b-1\b", 1.5),
-            (r"\bnot\s+(correct|right|working)\b", 1.5),
-        ],
-    },
-    "urgent": {
-        "weight": 1.2,  # slightly higher weight for urgent signals
-        "description": "Time-sensitive, blocking, or high-severity",
-        "patterns": [
-            (r"\bblocker\b", 2.0),
-            (r"\bblocking\b", 1.5),
-            (r"\basap\b", 2.0),
-            (r"\burgent\b", 2.0),
-            (r"\bcritical\b", 1.5),
-            (r"\bbreaking\s+change\b", 2.0),
-            (r"\bsecurity\b", 1.5),
-            (r"\bvulnerabilit(y|ies)\b", 2.0),
-            (r"\bhotfix\b", 1.5),
-            (r"\bseverity\b", 1.2),
-            (r"\bimmediately\b", 1.5),
-            (r"\bdo\s+not\s+merge\b", 2.0),
-            (r"\brevert\b", 1.5),
-            (r"\brollback\b", 1.5),
-        ],
-    },
+TONES = {
+    "very positive":  {"description": "Strong approval, gratitude, or enthusiasm",  "threshold": (0.5, None)},
+    "positive":       {"description": "Mild approval, agreement, or encouragement", "threshold": (0.05, 0.5)},
+    "neutral":        {"description": "Factual, informational, or balanced",        "threshold": (-0.05, 0.05)},
+    "negative":       {"description": "Mild concern, disagreement, or criticism",   "threshold": (-0.5, -0.05)},
+    "very negative":  {"description": "Strong disagreement, frustration, or alarm", "threshold": (None, -0.5)},
 }
 
-TONE_ORDER = ["positive", "constructive", "inquisitive", "neutral", "critical", "urgent"]
+TONE_ORDER = ["very positive", "positive", "neutral", "negative", "very negative"]
 
 TONE_COLORS = {
-    "positive": "\033[32m",      # green
-    "constructive": "\033[36m",  # cyan
-    "inquisitive": "\033[34m",   # blue
-    "neutral": "\033[37m",       # white/gray
-    "critical": "\033[33m",      # yellow
-    "urgent": "\033[31m",        # red
+    "very positive": "\033[1;32m",  # bold green
+    "positive":      "\033[32m",    # green
+    "neutral":       "\033[37m",    # white/gray
+    "negative":      "\033[33m",    # yellow
+    "very negative": "\033[31m",    # red
 }
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -211,9 +69,10 @@ class Comment:
     source: str  # "issue", "review", or "commit"
     context: str  # issue/PR title or number
     tone: str = ""
-    scores: dict = field(default_factory=dict)
-    top_score: float = 0.0
-    vader_compound: float = 0.0  # VADER compound score (-1 to +1)
+    compound: float = 0.0
+    pos: float = 0.0
+    neg: float = 0.0
+    neu: float = 0.0
 
 
 # -- GitHub API ---------------------------------------------------------------
@@ -294,73 +153,27 @@ def fetch_comments(repo: str, user: str | None, limit: int) -> list[Comment]:
 # -- Tone analysis ------------------------------------------------------------
 
 
-def _regex_score(text: str, tone: str) -> float:
-    """Compute keyword-match score for a single tone category."""
-    config = TONE_PATTERNS[tone]
-    score = 0.0
-    for pattern, weight in config["patterns"]:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        score += len(matches) * weight
-    return score * config["weight"]
+def classify(compound: float) -> str:
+    """Map a VADER compound score to a tone label."""
+    if compound >= 0.5:
+        return "very positive"
+    if compound >= 0.05:
+        return "positive"
+    if compound > -0.05:
+        return "neutral"
+    if compound > -0.5:
+        return "negative"
+    return "very negative"
 
 
 def analyze_tone(comment: Comment) -> Comment:
-    """Score a comment using VADER sentiment + keyword heuristics.
-
-    VADER handles the sentiment polarity axis (positive, neutral, critical)
-    accounting for negation ("not great"), intensifiers ("extremely good"),
-    capitalization ("GREAT"), punctuation ("nice!!!"), and emoji.
-
-    Keyword patterns handle intent-based tones (constructive, inquisitive,
-    urgent) and provide a secondary boost to VADER's polarity scores.
-
-    Falls back to pure keyword matching when VADER is unavailable.
-    """
-    text = comment.body
-    text_lower = text.lower()
-    scores: dict[str, float] = {}
-
-    if HAS_VADER:
-        vader_scores = _vader.polarity_scores(text)
-        compound = vader_scores["compound"]
-        comment.vader_compound = compound
-
-        # Map VADER compound to polarity categories (scaled to ~0-5 range
-        # so they're comparable with regex scores).
-        if compound >= 0:
-            scores["positive"] = compound * 5.0
-            scores["critical"] = 0.0
-        else:
-            scores["positive"] = 0.0
-            scores["critical"] = abs(compound) * 5.0
-        # Neutral peaks when compound is near zero
-        scores["neutral"] = (1.0 - abs(compound)) * 2.5
-
-        # Boost polarity scores with domain-specific keywords (at reduced
-        # weight -- VADER already captures general sentiment).
-        for tone in ("positive", "critical"):
-            scores[tone] += _regex_score(text_lower, tone) * 0.3
-
-        # Intent tones are purely regex-driven (VADER can't distinguish these)
-        for tone in ("constructive", "inquisitive", "urgent"):
-            scores[tone] = _regex_score(text_lower, tone)
-
-    else:
-        # Fallback: pure keyword matching for all categories
-        for tone in TONE_PATTERNS:
-            scores[tone] = _regex_score(text_lower, tone)
-
-    comment.scores = scores
-
-    # Pick the dominant tone (highest score), defaulting to "neutral"
-    max_score = max(scores.values()) if scores else 0
-    if max_score == 0:
-        comment.tone = "neutral"
-        comment.top_score = 0.0
-    else:
-        comment.tone = max(scores, key=scores.get)
-        comment.top_score = max_score
-
+    """Classify a comment's tone using VADER sentiment analysis."""
+    scores = _vader.polarity_scores(comment.body)
+    comment.compound = scores["compound"]
+    comment.pos = scores["pos"]
+    comment.neg = scores["neg"]
+    comment.neu = scores["neu"]
+    comment.tone = classify(comment.compound)
     return comment
 
 
@@ -381,14 +194,14 @@ def print_results(comments: list[Comment], verbose: bool, use_color: bool) -> No
     for c in comments:
         grouped[c.tone].append(c)
 
-    # Sort each group by score descending
+    # Sort each group by compound score (most extreme first)
     for tone in grouped:
-        grouped[tone].sort(key=lambda c: c.top_score, reverse=True)
+        grouped[tone].sort(key=lambda c: abs(c.compound), reverse=True)
 
     total = len(comments)
+    avg = sum(c.compound for c in comments) / total
     print()
-    engine = "VADER + keywords" if HAS_VADER else "keywords only"
-    header = f"Analyzed {total} comment{'s' if total != 1 else ''} ({engine})"
+    header = f"Analyzed {total} comment{'s' if total != 1 else ''} — average sentiment: {avg:+.2f}"
     print(f"{BOLD}{header}{RESET}" if use_color else header)
     print()
 
@@ -400,10 +213,10 @@ def print_results(comments: list[Comment], verbose: bool, use_color: bool) -> No
             continue
         pct = count / total * 100
         bar_len = int(pct / 2)
-        bar = "█" * bar_len
+        bar = "\u2588" * bar_len
         color = TONE_COLORS[tone] if use_color else ""
         reset = RESET if use_color else ""
-        label = f"  {tone:<14s} {color}{bar} {count} ({pct:.0f}%){reset}"
+        label = f"  {tone:<16s} {color}{bar} {count} ({pct:.0f}%){reset}"
         print(label)
     print()
 
@@ -418,30 +231,22 @@ def print_results(comments: list[Comment], verbose: bool, use_color: bool) -> No
         bold = BOLD if use_color else ""
         dim = DIM if use_color else ""
 
-        desc = TONE_PATTERNS[tone]["description"]
-        print(f"{bold}{color}── {tone.upper()} ({len(group)}) ─ {desc}{reset}")
+        desc = TONES[tone]["description"]
+        print(f"{bold}{color}\u2500\u2500 {tone.upper()} ({len(group)}) \u2500 {desc}{reset}")
         print()
 
         for c in group:
             source_tag = f"[{c.source}]"
             context_tag = f" {c.context}" if c.context else ""
-            meta = f"{dim}{c.created_at} {source_tag}{context_tag}{reset}"
+            score_tag = f"compound={c.compound:+.2f}"
+            meta = f"{dim}{c.created_at} {source_tag}{context_tag}  {score_tag}{reset}"
             print(f"  {meta}")
 
             body_preview = truncate(c.body)
             print(f"  {body_preview}")
 
             if verbose:
-                score_parts = [
-                    f"{t}={s:.1f}" for t, s in sorted(
-                        c.scores.items(), key=lambda x: x[1], reverse=True
-                    ) if s > 0
-                ]
-                if score_parts:
-                    vader_tag = ""
-                    if HAS_VADER:
-                        vader_tag = f" (vader={c.vader_compound:+.2f})"
-                    print(f"  {dim}scores: {', '.join(score_parts)}{vader_tag}{reset}")
+                print(f"  {dim}pos={c.pos:.2f}  neg={c.neg:.2f}  neu={c.neu:.2f}{reset}")
 
             if c.url:
                 print(f"  {dim}{c.url}{reset}")
@@ -478,7 +283,7 @@ def main():
     parser.add_argument(
         "--verbose", "-v",
         action="store_true",
-        help="Show detailed tone scores for each comment",
+        help="Show pos/neg/neu breakdown for each comment",
     )
     parser.add_argument(
         "--no-color",
