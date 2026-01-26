@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 """Sample a user's GitHub comments from a repository and sort them by tone.
 
-Uses the `gh` CLI for authenticated GitHub API access and keyword-based
-heuristics for tone classification. No external dependencies required.
+Uses the `gh` CLI for authenticated GitHub API access and a hybrid tone
+classifier combining VADER sentiment analysis (for polarity: positive,
+neutral, critical) with keyword heuristics (for intent: constructive,
+inquisitive, urgent).
+
+Install the optional dependency for best results:
+    pip install nltk
+    python -c "import nltk; nltk.download('vader_lexicon')"
+
+Falls back to pure keyword matching if nltk is not available.
 
 Usage:
     gh-tone-analyzer owner/repo [--user USER] [--limit N] [--verbose]
@@ -21,6 +29,14 @@ import sys
 import textwrap
 from collections import defaultdict
 from dataclasses import dataclass, field
+
+try:
+    from nltk.sentiment.vader import SentimentIntensityAnalyzer
+    _vader = SentimentIntensityAnalyzer()
+    HAS_VADER = True
+except (ImportError, LookupError):
+    _vader = None
+    HAS_VADER = False
 
 # -- Tone definitions --------------------------------------------------------
 
@@ -197,6 +213,7 @@ class Comment:
     tone: str = ""
     scores: dict = field(default_factory=dict)
     top_score: float = 0.0
+    vader_compound: float = 0.0  # VADER compound score (-1 to +1)
 
 
 # -- GitHub API ---------------------------------------------------------------
@@ -277,17 +294,61 @@ def fetch_comments(repo: str, user: str | None, limit: int) -> list[Comment]:
 # -- Tone analysis ------------------------------------------------------------
 
 
+def _regex_score(text: str, tone: str) -> float:
+    """Compute keyword-match score for a single tone category."""
+    config = TONE_PATTERNS[tone]
+    score = 0.0
+    for pattern, weight in config["patterns"]:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        score += len(matches) * weight
+    return score * config["weight"]
+
+
 def analyze_tone(comment: Comment) -> Comment:
-    """Score a comment against each tone category and assign the dominant tone."""
-    text = comment.body.lower()
+    """Score a comment using VADER sentiment + keyword heuristics.
+
+    VADER handles the sentiment polarity axis (positive, neutral, critical)
+    accounting for negation ("not great"), intensifiers ("extremely good"),
+    capitalization ("GREAT"), punctuation ("nice!!!"), and emoji.
+
+    Keyword patterns handle intent-based tones (constructive, inquisitive,
+    urgent) and provide a secondary boost to VADER's polarity scores.
+
+    Falls back to pure keyword matching when VADER is unavailable.
+    """
+    text = comment.body
+    text_lower = text.lower()
     scores: dict[str, float] = {}
 
-    for tone, config in TONE_PATTERNS.items():
-        tone_score = 0.0
-        for pattern, weight in config["patterns"]:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            tone_score += len(matches) * weight
-        scores[tone] = tone_score * config["weight"]
+    if HAS_VADER:
+        vader_scores = _vader.polarity_scores(text)
+        compound = vader_scores["compound"]
+        comment.vader_compound = compound
+
+        # Map VADER compound to polarity categories (scaled to ~0-5 range
+        # so they're comparable with regex scores).
+        if compound >= 0:
+            scores["positive"] = compound * 5.0
+            scores["critical"] = 0.0
+        else:
+            scores["positive"] = 0.0
+            scores["critical"] = abs(compound) * 5.0
+        # Neutral peaks when compound is near zero
+        scores["neutral"] = (1.0 - abs(compound)) * 2.5
+
+        # Boost polarity scores with domain-specific keywords (at reduced
+        # weight -- VADER already captures general sentiment).
+        for tone in ("positive", "critical"):
+            scores[tone] += _regex_score(text_lower, tone) * 0.3
+
+        # Intent tones are purely regex-driven (VADER can't distinguish these)
+        for tone in ("constructive", "inquisitive", "urgent"):
+            scores[tone] = _regex_score(text_lower, tone)
+
+    else:
+        # Fallback: pure keyword matching for all categories
+        for tone in TONE_PATTERNS:
+            scores[tone] = _regex_score(text_lower, tone)
 
     comment.scores = scores
 
@@ -326,7 +387,8 @@ def print_results(comments: list[Comment], verbose: bool, use_color: bool) -> No
 
     total = len(comments)
     print()
-    header = f"Analyzed {total} comment{'s' if total != 1 else ''}"
+    engine = "VADER + keywords" if HAS_VADER else "keywords only"
+    header = f"Analyzed {total} comment{'s' if total != 1 else ''} ({engine})"
     print(f"{BOLD}{header}{RESET}" if use_color else header)
     print()
 
@@ -376,7 +438,10 @@ def print_results(comments: list[Comment], verbose: bool, use_color: bool) -> No
                     ) if s > 0
                 ]
                 if score_parts:
-                    print(f"  {dim}scores: {', '.join(score_parts)}{reset}")
+                    vader_tag = ""
+                    if HAS_VADER:
+                        vader_tag = f" (vader={c.vader_compound:+.2f})"
+                    print(f"  {dim}scores: {', '.join(score_parts)}{vader_tag}{reset}")
 
             if c.url:
                 print(f"  {dim}{c.url}{reset}")
