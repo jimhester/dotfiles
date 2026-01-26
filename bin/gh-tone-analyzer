@@ -1,0 +1,447 @@
+#!/usr/bin/env python3
+"""Sample a user's GitHub comments from a repository and sort them by tone.
+
+Uses the `gh` CLI for authenticated GitHub API access and keyword-based
+heuristics for tone classification. No external dependencies required.
+
+Usage:
+    gh-tone-analyzer owner/repo [--user USER] [--limit N] [--verbose]
+
+Examples:
+    gh-tone-analyzer tidyverse/dplyr --user hadley
+    gh-tone-analyzer rust-lang/rust --user dtolnay --limit 50
+    gh-tone-analyzer myorg/myrepo --verbose
+"""
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+import textwrap
+from collections import defaultdict
+from dataclasses import dataclass, field
+
+# -- Tone definitions --------------------------------------------------------
+
+TONE_PATTERNS = {
+    "positive": {
+        "weight": 1.0,
+        "description": "Appreciative, encouraging, or agreeable",
+        "patterns": [
+            (r"\bthanks?\b", 1.5),
+            (r"\bthank\s+you\b", 2.0),
+            (r"\bgreat\b", 1.0),
+            (r"\bawesome\b", 1.2),
+            (r"\blgtm\b", 2.0),
+            (r"\blooks?\s+good\b", 1.5),
+            (r"\bnice\b", 1.0),
+            (r"\blove\b", 1.0),
+            (r"\bwell\s+done\b", 1.5),
+            (r"\bexcellent\b", 1.2),
+            (r"\bperfect\b", 1.0),
+            (r"\bamazing\b", 1.2),
+            (r"\bfantastic\b", 1.2),
+            (r"\b\+1\b", 1.5),
+            (r"\bagree\b", 1.0),
+            (r"\bhelpful\b", 1.0),
+            (r"\bbrilliant\b", 1.2),
+            (r"\bsolid\b", 0.8),
+            (r"\bclean\b", 0.8),
+            (r"\belegant\b", 1.0),
+            (r"👍|🎉|❤️|🚀|💯", 1.5),
+        ],
+    },
+    "constructive": {
+        "weight": 1.0,
+        "description": "Suggestions, improvements, or alternatives",
+        "patterns": [
+            (r"\bconsider\b", 1.5),
+            (r"\bsuggest\b", 1.5),
+            (r"\bmight\s+want\b", 1.2),
+            (r"\bcould\s+(we|you|this|it)\b", 1.2),
+            (r"\bmaybe\b", 1.0),
+            (r"\bwhat\s+about\b", 1.2),
+            (r"\bhow\s+about\b", 1.2),
+            (r"\balternative(ly)?\b", 1.2),
+            (r"\binstead\b", 1.0),
+            (r"\bprefer\b", 1.0),
+            (r"\bwould\s+be\s+(better|nicer|cleaner)\b", 1.5),
+            (r"\bnit(pick)?\b", 1.5),
+            (r"\bminor\b", 0.8),
+            (r"\btweaks?\b", 1.0),
+            (r"\bimprove\b", 1.0),
+            (r"\brefactor\b", 1.0),
+            (r"\bsimplif(y|ied)\b", 1.0),
+            (r"\boptional\b", 0.8),
+            (r"\bone\s+option\b", 1.2),
+        ],
+    },
+    "inquisitive": {
+        "weight": 1.0,
+        "description": "Questions, clarifications, or exploration",
+        "patterns": [
+            (r"\?", 1.0),
+            (r"\bwhy\b", 1.0),
+            (r"\bhow\s+(does|do|did|is|are|would|will|can)\b", 1.2),
+            (r"\bwhat\s+(is|are|does|do|did|would|will|if)\b", 1.2),
+            (r"\bwhen\s+(does|do|did|is|should|will)\b", 1.0),
+            (r"\bcould\s+you\s+explain\b", 1.5),
+            (r"\bwondering\b", 1.2),
+            (r"\bcurious\b", 1.2),
+            (r"\bunderstand\b", 0.8),
+            (r"\bclarif(y|ication)\b", 1.5),
+            (r"\bconfused\b", 1.0),
+            (r"\bnot\s+sure\b", 1.0),
+            (r"\bdoes\s+this\b", 1.0),
+            (r"\bis\s+this\b", 0.8),
+            (r"\bis\s+there\b", 0.8),
+        ],
+    },
+    "neutral": {
+        "weight": 0.8,  # slightly lower weight so more specific tones win ties
+        "description": "Factual, informational, or status updates",
+        "patterns": [
+            (r"\bnote\s+that\b", 1.2),
+            (r"\bfyi\b", 1.5),
+            (r"\bfor\s+(your\s+)?(reference|info)\b", 1.2),
+            (r"\bupdated?\b", 1.0),
+            (r"\badded\b", 1.0),
+            (r"\bchanged\b", 1.0),
+            (r"\bfixed\b", 1.0),
+            (r"\bremoved\b", 1.0),
+            (r"\bthis\s+(is|was|will)\b", 0.5),
+            (r"\brelated\s+to\b", 1.0),
+            (r"\bsee\s+(also|#\d+|http)\b", 1.2),
+            (r"\bcc\s+@\b", 1.5),
+            (r"\bref\b", 0.8),
+            (r"\bmerged\b", 1.0),
+            (r"\bclosed\b", 1.0),
+            (r"\brebased\b", 1.0),
+            (r"\baddressed\b", 1.0),
+        ],
+    },
+    "critical": {
+        "weight": 1.0,
+        "description": "Disagreement, concerns, or problem reports",
+        "patterns": [
+            (r"\bwrong\b", 1.5),
+            (r"\bincorrect\b", 1.5),
+            (r"\bbug\b", 1.2),
+            (r"\bissue\b", 0.8),
+            (r"\bproblem\b", 1.0),
+            (r"\bdoesn'?t\s+work\b", 1.5),
+            (r"\bbroken\b", 1.5),
+            (r"\bfail(s|ed|ing|ure)?\b", 1.2),
+            (r"\berror\b", 1.0),
+            (r"\bdisagree\b", 1.5),
+            (r"\bshould\s+not\b", 1.2),
+            (r"\bshouldn'?t\b", 1.2),
+            (r"\bwon'?t\b", 0.8),
+            (r"\bcan'?t\b", 0.8),
+            (r"\bmissing\b", 1.0),
+            (r"\bincomplete\b", 1.2),
+            (r"\bregression\b", 1.5),
+            (r"\bunexpected\b", 1.2),
+            (r"\b-1\b", 1.5),
+            (r"\bnot\s+(correct|right|working)\b", 1.5),
+        ],
+    },
+    "urgent": {
+        "weight": 1.2,  # slightly higher weight for urgent signals
+        "description": "Time-sensitive, blocking, or high-severity",
+        "patterns": [
+            (r"\bblocker\b", 2.0),
+            (r"\bblocking\b", 1.5),
+            (r"\basap\b", 2.0),
+            (r"\burgent\b", 2.0),
+            (r"\bcritical\b", 1.5),
+            (r"\bbreaking\s+change\b", 2.0),
+            (r"\bsecurity\b", 1.5),
+            (r"\bvulnerabilit(y|ies)\b", 2.0),
+            (r"\bhotfix\b", 1.5),
+            (r"\bseverity\b", 1.2),
+            (r"\bimmediately\b", 1.5),
+            (r"\bdo\s+not\s+merge\b", 2.0),
+            (r"\brevert\b", 1.5),
+            (r"\brollback\b", 1.5),
+        ],
+    },
+}
+
+TONE_ORDER = ["positive", "constructive", "inquisitive", "neutral", "critical", "urgent"]
+
+TONE_COLORS = {
+    "positive": "\033[32m",      # green
+    "constructive": "\033[36m",  # cyan
+    "inquisitive": "\033[34m",   # blue
+    "neutral": "\033[37m",       # white/gray
+    "critical": "\033[33m",      # yellow
+    "urgent": "\033[31m",        # red
+}
+RESET = "\033[0m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+
+
+# -- Data structures ----------------------------------------------------------
+
+
+@dataclass
+class Comment:
+    body: str
+    url: str
+    created_at: str
+    source: str  # "issue", "review", or "commit"
+    context: str  # issue/PR title or number
+    tone: str = ""
+    scores: dict = field(default_factory=dict)
+    top_score: float = 0.0
+
+
+# -- GitHub API ---------------------------------------------------------------
+
+
+def gh_api(endpoint: str, paginate: bool = True) -> list[dict]:
+    """Call the GitHub API via the `gh` CLI."""
+    cmd = ["gh", "api", endpoint, "--jq", ".[]"]
+    if paginate:
+        cmd.append("--paginate")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except FileNotFoundError:
+        print("Error: `gh` CLI not found. Install it from https://cli.github.com/", file=sys.stderr)
+        sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        print(f"Error calling GitHub API ({endpoint}):\n{e.stderr.strip()}", file=sys.stderr)
+        sys.exit(1)
+
+    # gh --jq '.[]' outputs one JSON object per line
+    items = []
+    for line in result.stdout.strip().splitlines():
+        if line:
+            try:
+                items.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return items
+
+
+def fetch_comments(repo: str, user: str | None, limit: int) -> list[Comment]:
+    """Fetch issue comments, PR review comments, and commit comments."""
+    comments: list[Comment] = []
+
+    sources = [
+        (f"/repos/{repo}/issues/comments", "issue"),
+        (f"/repos/{repo}/pulls/comments", "review"),
+        (f"/repos/{repo}/comments", "commit"),
+    ]
+
+    for endpoint, source in sources:
+        params = "?sort=created&direction=desc&per_page=100"
+        raw = gh_api(endpoint + params)
+
+        for item in raw:
+            author = (item.get("user") or {}).get("login", "")
+            if user and author.lower() != user.lower():
+                continue
+
+            body = item.get("body", "") or ""
+            if not body.strip():
+                continue
+
+            html_url = item.get("html_url", "")
+            created = item.get("created_at", "")[:10]
+
+            # Derive context (issue/PR number) from the URL
+            context = ""
+            if html_url:
+                m = re.search(r"/(issues|pull)/(\d+)", html_url)
+                if m:
+                    context = f"#{m.group(2)}"
+
+            comments.append(Comment(
+                body=body,
+                url=html_url,
+                created_at=created,
+                source=source,
+                context=context,
+            ))
+
+        if len(comments) >= limit:
+            break
+
+    return comments[:limit]
+
+
+# -- Tone analysis ------------------------------------------------------------
+
+
+def analyze_tone(comment: Comment) -> Comment:
+    """Score a comment against each tone category and assign the dominant tone."""
+    text = comment.body.lower()
+    scores: dict[str, float] = {}
+
+    for tone, config in TONE_PATTERNS.items():
+        tone_score = 0.0
+        for pattern, weight in config["patterns"]:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            tone_score += len(matches) * weight
+        scores[tone] = tone_score * config["weight"]
+
+    comment.scores = scores
+
+    # Pick the dominant tone (highest score), defaulting to "neutral"
+    max_score = max(scores.values()) if scores else 0
+    if max_score == 0:
+        comment.tone = "neutral"
+        comment.top_score = 0.0
+    else:
+        comment.tone = max(scores, key=scores.get)
+        comment.top_score = max_score
+
+    return comment
+
+
+# -- Display ------------------------------------------------------------------
+
+
+def truncate(text: str, width: int = 120) -> str:
+    """Collapse whitespace and truncate text to a single line."""
+    collapsed = re.sub(r"\s+", " ", text).strip()
+    if len(collapsed) <= width:
+        return collapsed
+    return collapsed[: width - 1] + "…"
+
+
+def print_results(comments: list[Comment], verbose: bool, use_color: bool) -> None:
+    """Print comments grouped and sorted by tone."""
+    grouped: dict[str, list[Comment]] = defaultdict(list)
+    for c in comments:
+        grouped[c.tone].append(c)
+
+    # Sort each group by score descending
+    for tone in grouped:
+        grouped[tone].sort(key=lambda c: c.top_score, reverse=True)
+
+    total = len(comments)
+    print()
+    header = f"Analyzed {total} comment{'s' if total != 1 else ''}"
+    print(f"{BOLD}{header}{RESET}" if use_color else header)
+    print()
+
+    # Summary bar
+    print("Distribution:")
+    for tone in TONE_ORDER:
+        count = len(grouped.get(tone, []))
+        if count == 0:
+            continue
+        pct = count / total * 100
+        bar_len = int(pct / 2)
+        bar = "█" * bar_len
+        color = TONE_COLORS[tone] if use_color else ""
+        reset = RESET if use_color else ""
+        label = f"  {tone:<14s} {color}{bar} {count} ({pct:.0f}%){reset}"
+        print(label)
+    print()
+
+    # Detailed listing
+    for tone in TONE_ORDER:
+        group = grouped.get(tone, [])
+        if not group:
+            continue
+
+        color = TONE_COLORS[tone] if use_color else ""
+        reset = RESET if use_color else ""
+        bold = BOLD if use_color else ""
+        dim = DIM if use_color else ""
+
+        desc = TONE_PATTERNS[tone]["description"]
+        print(f"{bold}{color}── {tone.upper()} ({len(group)}) ─ {desc}{reset}")
+        print()
+
+        for c in group:
+            source_tag = f"[{c.source}]"
+            context_tag = f" {c.context}" if c.context else ""
+            meta = f"{dim}{c.created_at} {source_tag}{context_tag}{reset}"
+            print(f"  {meta}")
+
+            body_preview = truncate(c.body)
+            print(f"  {body_preview}")
+
+            if verbose:
+                score_parts = [
+                    f"{t}={s:.1f}" for t, s in sorted(
+                        c.scores.items(), key=lambda x: x[1], reverse=True
+                    ) if s > 0
+                ]
+                if score_parts:
+                    print(f"  {dim}scores: {', '.join(score_parts)}{reset}")
+
+            if c.url:
+                print(f"  {dim}{c.url}{reset}")
+            print()
+
+        print()
+
+
+# -- Main ---------------------------------------------------------------------
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Sample a user's GitHub comments and sort them by tone.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=textwrap.dedent("""\
+            examples:
+              %(prog)s tidyverse/dplyr --user hadley
+              %(prog)s rust-lang/rust --user dtolnay --limit 50
+              %(prog)s myorg/myrepo --verbose
+        """),
+    )
+    parser.add_argument("repo", help="GitHub repository (owner/repo)")
+    parser.add_argument(
+        "--user", "-u",
+        help="GitHub username to filter by (default: all users)",
+    )
+    parser.add_argument(
+        "--limit", "-n",
+        type=int,
+        default=100,
+        help="Maximum number of comments to analyze (default: 100)",
+    )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed tone scores for each comment",
+    )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable colored output",
+    )
+    args = parser.parse_args()
+
+    if "/" not in args.repo:
+        parser.error("Repository must be in owner/repo format")
+
+    use_color = not args.no_color and sys.stdout.isatty()
+
+    print(f"Fetching comments from {args.repo}" + (
+        f" by @{args.user}" if args.user else ""
+    ) + "...")
+
+    comments = fetch_comments(args.repo, args.user, args.limit)
+
+    if not comments:
+        print("No comments found matching the criteria.")
+        sys.exit(0)
+
+    for comment in comments:
+        analyze_tone(comment)
+
+    print_results(comments, args.verbose, use_color)
+
+
+if __name__ == "__main__":
+    main()
