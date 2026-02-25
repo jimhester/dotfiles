@@ -111,15 +111,19 @@ return {
       -- Configure LSP servers using native Neovim API
       vim.lsp.config("lua_ls", {
         cmd = { vim.fn.stdpath("data") .. "/mason/bin/lua-language-server" },
+        filetypes = { "lua" },
       })
       vim.lsp.config("r_language_server", {
         cmd = { "r-languageserver" },
+        filetypes = { "r", "rmd" },
       })
       vim.lsp.config("clangd", {
         cmd = { vim.fn.stdpath("data") .. "/mason/bin/clangd" },
+        filetypes = { "c", "cpp", "objc", "objcpp" },
       })
       vim.lsp.config("pyright", {
         cmd = { vim.fn.stdpath("data") .. "/mason/bin/pyright-langserver", "--stdio" },
+        filetypes = { "python" },
       })
       vim.lsp.enable({ "lua_ls", "r_language_server", "clangd", "pyright" })
     end,
