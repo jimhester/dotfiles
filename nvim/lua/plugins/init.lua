@@ -112,18 +112,22 @@ return {
       vim.lsp.config("lua_ls", {
         cmd = { vim.fn.stdpath("data") .. "/mason/bin/lua-language-server" },
         filetypes = { "lua" },
+        root_markers = { ".luarc.json", ".luarc.jsonc", ".git" },
       })
       vim.lsp.config("r_language_server", {
         cmd = { "r-languageserver" },
         filetypes = { "r", "rmd" },
+        root_markers = { "DESCRIPTION", ".Rproj", ".git" },
       })
       vim.lsp.config("clangd", {
         cmd = { vim.fn.stdpath("data") .. "/mason/bin/clangd" },
         filetypes = { "c", "cpp", "objc", "objcpp" },
+        root_markers = { "compile_commands.json", "compile_flags.txt", ".clangd", ".git" },
       })
       vim.lsp.config("pyright", {
         cmd = { vim.fn.stdpath("data") .. "/mason/bin/pyright-langserver", "--stdio" },
         filetypes = { "python" },
+        root_markers = { "pyproject.toml", "setup.py", "setup.cfg", "pyrightconfig.json", ".git" },
       })
       vim.lsp.enable({ "lua_ls", "r_language_server", "clangd", "pyright" })
     end,
