@@ -1,0 +1,4 @@
+#!/bin/bash
+# llm - wrapper for Simon Willison's llm CLI with Netflix Model Gateway plugin
+# Requires: uvx (from uv), MODEL_GATEWAY_PROJECT_ID env var
+exec uvx --quiet --with llm-netflix llm "$@"

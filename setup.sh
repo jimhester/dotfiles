@@ -86,6 +86,9 @@ fi
 # Work script for Claude Code
 make_link ~/.local/bin/work "$WORK_REPO/work"
 
+# llm CLI wrapper (Netflix Model Gateway via uvx)
+make_link ~/.local/bin/llm "$DOTFILES_DIR/zsh/bin/llm"
+
 # Claude Code skills
 make_link ~/.claude/skills/work "$WORK_REPO/skills/work"
 
