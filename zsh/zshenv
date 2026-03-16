@@ -32,5 +32,9 @@ export MAX_THINKING_TOKENS=127999
 # Disable Vercel plugin telemetry in Claude Code
 export VERCEL_PLUGIN_TELEMETRY=off
 
+# llm-panel: override stale defaults (nf-gemini-pro doesn't exist)
+# Update periodically: `llm models | grep nflx` to find latest
+export LLM_PANEL_MODELS="nflx/gpt-5.2,nflx/claude-opus-4-6,nflx/gemini-3.1-pro-preview"
+
 # Source local secrets if they exist (API keys, etc.)
 [[ -f ~/.zshenv.local ]] && source ~/.zshenv.local
