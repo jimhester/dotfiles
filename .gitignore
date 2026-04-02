@@ -82,3 +82,6 @@ vignettes/*.pdf
 compile_commands.json
 # Cloned work repo (managed separately)
 work/
+
+# Work tool temporary files
+.work-review-status
