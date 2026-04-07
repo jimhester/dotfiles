@@ -1,0 +1,55 @@
+#!/bin/bash
+# Run a command as the claude-agent user.
+# Usage: become-agent <user> [command ...]
+#        become-agent <user>              # defaults to: claude --permission-mode auto --effort max
+#
+# Requires sudoers entry: jimhester ALL=(claude-agent) NOPASSWD: SETENV: ALL
+
+set -euo pipefail
+
+AGENT_USER="${1:-claude-agent}"
+shift 2>/dev/null || true
+
+if [[ $# -eq 0 ]]; then
+    set -- claude --permission-mode auto --effort max
+fi
+
+# Environment variables to pass through to the agent process
+PRESERVE_ENV="ANTHROPIC_API_KEY"
+PRESERVE_ENV="${PRESERVE_ENV},ANTHROPIC_BASE_URL"
+PRESERVE_ENV="${PRESERVE_ENV},CLAUDE_CODE_EFFORT_LEVEL"
+PRESERVE_ENV="${PRESERVE_ENV},CLAUDE_CODE_ENABLE_TELEMETRY"
+PRESERVE_ENV="${PRESERVE_ENV},CLAUDE_CODE_SUBAGENT_MODEL"
+PRESERVE_ENV="${PRESERVE_ENV},OTEL_EXPORTER_OTLP_ENDPOINT"
+PRESERVE_ENV="${PRESERVE_ENV},CONNECT_API_KEY"
+PRESERVE_ENV="${PRESERVE_ENV},CONNECT_TEST_API_KEY"
+PRESERVE_ENV="${PRESERVE_ENV},OPENAI_API_KEY"
+PRESERVE_ENV="${PRESERVE_ENV},OPENAI_BASE_URL"
+PRESERVE_ENV="${PRESERVE_ENV},TABLEAU_PAT"
+PRESERVE_ENV="${PRESERVE_ENV},MODEL_GATEWAY_PROJECT_ID"
+PRESERVE_ENV="${PRESERVE_ENV},GOOGLE_API_KEY"
+PRESERVE_ENV="${PRESERVE_ENV},TERM"
+PRESERVE_ENV="${PRESERVE_ENV},LANG"
+PRESERVE_ENV="${PRESERVE_ENV},ENABLE_INCREMENTAL_TUI"
+PRESERVE_ENV="${PRESERVE_ENV},WORK_WORKER_ID"
+PRESERVE_ENV="${PRESERVE_ENV},WORK_DB_PATH"
+PRESERVE_ENV="${PRESERVE_ENV},GH_ENTERPRISE_TOKEN"
+
+# Read gh token from primary user's keychain (already unlocked for GUI session)
+# so the agent gets it via env var — never written to disk.
+# GH_ENTERPRISE_TOKEN is used by gh CLI for GitHub Enterprise (github.netflix.net).
+if [[ -z "${GH_ENTERPRISE_TOKEN:-}" ]]; then
+    GH_ENTERPRISE_TOKEN=$(gh auth token --hostname github.netflix.net 2>/dev/null || true)
+    export GH_ENTERPRISE_TOKEN
+fi
+
+# sudo resets PATH to secure defaults regardless of --preserve-env,
+# so we inject the agent's PATH explicitly via env(1).
+AGENT_HOME=$(dscl . -read "/Users/${AGENT_USER}" NFSHomeDirectory 2>/dev/null | awk '{print $2}')
+AGENT_HOME="${AGENT_HOME:-/Users/${AGENT_USER}}"
+AGENT_PATH="${AGENT_HOME}/.local/bin:/opt/nflx/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+exec sudo -u "${AGENT_USER}" \
+    --set-home \
+    "--preserve-env=${PRESERVE_ENV}" \
+    -- env "PATH=${AGENT_PATH}" "$@"

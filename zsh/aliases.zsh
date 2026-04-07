@@ -32,7 +32,8 @@ alias showmd='grip'
 alias t='todo.sh'
 alias ta='todo.sh add'
 alias tl='todo.sh list'
-alias clc='claude --dangerously-skip-permissions'
+alias clc='become-agent claude-agent claude --permission-mode auto --effort max'
+alias mclc='ANTHROPIC_BASE_URL= CLAUDE_CODE_ENABLE_TELEMETRY= CLAUDE_CODE_SUBAGENT_MODEL= OTEL_EXPORTER_OTLP_ENDPOINT= /opt/homebrew/bin/claude --permission-mode auto --effort max'
 
 # Delete key on tmux OSX
 bindkey "^[[3~" delete-char

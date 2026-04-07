@@ -86,6 +86,9 @@ fi
 # Work script for Claude Code
 make_link ~/.local/bin/work "$WORK_REPO/work"
 
+# become-agent: run commands as limited claude-agent user
+make_link ~/.local/bin/become-agent "$DOTFILES_DIR/bin/become-agent"
+
 # llm CLI wrapper (Netflix Model Gateway via uvx)
 make_link ~/.local/bin/llm "$DOTFILES_DIR/zsh/bin/llm"
 
