@@ -225,6 +225,15 @@ git_protocol: https
 prompt: disabled
 GHCONFIG
 
+# Register github.netflix.net as a known host (token comes from
+# GH_ENTERPRISE_TOKEN env var injected by become-agent at exec time)
+cat > "${AGENT_HOME}/.config/gh/hosts.yml" <<GHHOSTS
+github.netflix.net:
+    git_protocol: https
+    user: ${PRIMARY_USER}
+GHHOSTS
+chmod 600 "${AGENT_HOME}/.config/gh/hosts.yml"
+
 # --- .local/bin/ tool symlinks ---
 echo "Setting up tool symlinks..."
 mkdir -p "${AGENT_HOME}/.local/bin"
