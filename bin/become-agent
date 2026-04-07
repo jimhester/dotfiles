@@ -7,6 +7,22 @@
 
 set -euo pipefail
 
+# Debug mode: BECOME_AGENT_DEBUG=1 become-agent ...
+# Logs to /tmp/become-agent-debug.log and enables GIT_TRACE, GH_DEBUG
+DEBUG_LOG="/tmp/become-agent-debug.log"
+if [[ -n "${BECOME_AGENT_DEBUG:-}" ]]; then
+    exec 3>>"$DEBUG_LOG"
+    dbg() { echo "[$(date '+%H:%M:%S.%N')] $*" >&3; }
+    dbg "=== become-agent starting (pid=$$) ==="
+    dbg "caller: $(ps -o comm= -p $PPID 2>/dev/null || echo unknown)"
+    dbg "args: $*"
+    # Enable tool-level debug logging
+    export GIT_TRACE=/tmp/become-agent-git-trace.log
+    export GH_DEBUG=1
+else
+    dbg() { :; }
+fi
+
 AGENT_USER="${1:-claude-agent}"
 shift 2>/dev/null || true
 
@@ -35,12 +51,17 @@ PRESERVE_ENV="${PRESERVE_ENV},WORK_WORKER_ID"
 PRESERVE_ENV="${PRESERVE_ENV},WORK_DB_PATH"
 PRESERVE_ENV="${PRESERVE_ENV},GH_ENTERPRISE_TOKEN"
 
-# Read gh token from primary user's keychain (already unlocked for GUI session)
-# so the agent gets it via env var — never written to disk.
+# Read gh token from primary user's keychain so the agent gets it via env var.
 # GH_ENTERPRISE_TOKEN is used by gh CLI for GitHub Enterprise (github.netflix.net).
+# Uses timeout to avoid blocking on a locked keychain (which shows a macOS
+# "security wants to use the login keychain" dialog).
 if [[ -z "${GH_ENTERPRISE_TOKEN:-}" ]]; then
-    GH_ENTERPRISE_TOKEN=$(gh auth token --hostname github.netflix.net 2>/dev/null || true)
+    dbg "fetching GH_ENTERPRISE_TOKEN via gh auth token..."
+    GH_ENTERPRISE_TOKEN=$(timeout 2 gh auth token --hostname github.netflix.net 2>/dev/null || true)
     export GH_ENTERPRISE_TOKEN
+    if [[ -z "$GH_ENTERPRISE_TOKEN" ]]; then
+        dbg "WARNING: could not read gh token (keychain locked?). gh commands may fail."
+    fi
 fi
 
 # sudo resets PATH to secure defaults regardless of --preserve-env,
@@ -48,6 +69,10 @@ fi
 AGENT_HOME=$(dscl . -read "/Users/${AGENT_USER}" NFSHomeDirectory 2>/dev/null | awk '{print $2}')
 AGENT_HOME="${AGENT_HOME:-/Users/${AGENT_USER}}"
 AGENT_PATH="${AGENT_HOME}/.local/bin:/opt/nflx/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+dbg "AGENT_HOME=${AGENT_HOME}"
+dbg "GH_ENTERPRISE_TOKEN length=${#GH_ENTERPRISE_TOKEN}"
+dbg "exec sudo -u ${AGENT_USER} ... $*"
 
 exec sudo -u "${AGENT_USER}" \
     --set-home \
