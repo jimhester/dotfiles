@@ -89,6 +89,10 @@ make_link ~/.local/bin/work "$WORK_REPO/work"
 # become-agent: run commands as limited claude-agent user
 make_link ~/.local/bin/become-agent "$DOTFILES_DIR/bin/become-agent"
 
+# Fix metatron ACLs for claude-agent after cert refresh (launchd WatchPaths)
+cp "$DOTFILES_DIR/bin/fix-metatron-acl.plist" ~/Library/LaunchAgents/com.jimhester.fix-metatron-acl.plist 2>/dev/null || true
+launchctl load ~/Library/LaunchAgents/com.jimhester.fix-metatron-acl.plist 2>/dev/null || true
+
 # llm CLI wrapper (Netflix Model Gateway via uvx)
 make_link ~/.local/bin/llm "$DOTFILES_DIR/zsh/bin/llm"
 

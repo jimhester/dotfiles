@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jimhester.fix-metatron-acl</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/jimhester/dotfiles/bin/fix-metatron-acl.sh</string>
+    </array>
+    <key>WatchPaths</key>
+    <array>
+        <string>/Users/jimhester/.metatron/certificates</string>
+    </array>
+    <key>StandardErrorPath</key>
+    <string>/Users/jimhester/Library/Logs/fix-metatron-acl.log</string>
+    <key>StandardOutPath</key>
+    <string>/Users/jimhester/Library/Logs/fix-metatron-acl.log</string>
+</dict>
+</plist>
