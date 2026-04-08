@@ -82,6 +82,12 @@ else
     cat > "${SUDOERS_FILE}" <<EOF
 # Allow ${PRIMARY_USER} to run commands as ${AGENT_USER} without password
 ${PRIMARY_USER} ALL=(${AGENT_USER}) NOPASSWD: SETENV: ALL
+
+# Allow ${AGENT_USER} to run Chrome as ${PRIMARY_USER} (needs GUI session for Mach ports)
+${AGENT_USER} ALL=(${PRIMARY_USER}) NOPASSWD: SETENV: ${PRIMARY_HOME}/dotfiles/bin/chromium-for-agent.sh
+
+# Allow fd passthrough for Playwright debugging pipe (fds 3-4)
+Defaults:${AGENT_USER} closefrom_override
 EOF
     chmod 440 "${SUDOERS_FILE}"
     # Validate

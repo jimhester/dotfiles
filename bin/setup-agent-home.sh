@@ -58,8 +58,16 @@ make_link "${AGENT_HOME}/.claude/plugins" "${PRIMARY_HOME}/.claude/plugins"
 # Statsig — share feature flags/trust state
 make_link "${AGENT_HOME}/.claude/statsig" "${PRIMARY_HOME}/.claude/statsig"
 
-# MCP config
-make_link "${AGENT_HOME}/.claude/mcp.json" "${PRIMARY_HOME}/.claude/mcp.json"
+# MCP config — agent-specific overrides (e.g. Playwright needs Chrome wrapper)
+# Not symlinked because agent needs different browser launch config.
+cat > "${AGENT_HOME}/.claude/mcp.json" <<'MCPJSON'
+{
+  "playwright": {
+    "command": "npx",
+    "args": ["@playwright/mcp@latest", "--executable-path", "/Users/claude-agent/.local/bin/chromium-playwright"]
+  }
+}
+MCPJSON
 
 # Share trust state and project onboarding (stored in ~/.claude.json)
 make_link "${AGENT_HOME}/.claude.json" "${PRIMARY_HOME}/.claude.json"
@@ -244,6 +252,17 @@ make_link "${AGENT_HOME}/.local/bin/ghe" "${AGENT_HOME}/.local/bin/gh"
 make_link "${AGENT_HOME}/.local/bin/work" "${DOTFILES_DIR}/work/work"
 make_link "${AGENT_HOME}/.local/bin/become-agent" "${DOTFILES_DIR}/bin/become-agent"
 make_link "${AGENT_HOME}/.local/bin/llm" "${DOTFILES_DIR}/zsh/bin/llm"
+
+# Chromium wrapper for Playwright — runs Chrome as primary user (who has a
+# macOS GUI session with Mach port access that Chrome requires).
+# Requires sudoers: claude-agent ALL=(jimhester) NOPASSWD: SETENV: .../chromium-for-agent.sh
+cat > "${AGENT_HOME}/.local/bin/chromium-playwright" <<SH
+#!/bin/bash
+# -C 5 preserves fds 3-4 (Playwright debugging pipe) across sudo.
+# Requires: Defaults:claude-agent closefrom_override in sudoers.
+exec sudo -n -C 5 -u ${PRIMARY_USER} ${DOTFILES_DIR}/bin/chromium-for-agent.sh "\$@"
+SH
+chmod +x "${AGENT_HOME}/.local/bin/chromium-playwright"
 
 # --- .zshenv (minimal shell config) ---
 echo "Setting up .zshenv..."
