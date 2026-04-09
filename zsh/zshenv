@@ -27,5 +27,8 @@ export ENABLE_INCREMENTAL_TUI=true
 # Claude Code: use max effort by default (only valid for Opus)
 export CLAUDE_CODE_EFFORT_LEVEL=max
 
+# Disable Vercel plugin telemetry in Claude Code
+export VERCEL_PLUGIN_TELEMETRY=off
+
 # Source local secrets if they exist (API keys, etc.)
 [[ -f ~/.zshenv.local ]] && source ~/.zshenv.local
