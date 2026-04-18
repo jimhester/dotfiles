@@ -5,23 +5,14 @@
 #
 # Requires sudoers entry: jimhester ALL=(claude-agent) NOPASSWD: SETENV: ALL
 
-set -euo pipefail
-
-# Debug mode: BECOME_AGENT_DEBUG=1 become-agent ...
-# Logs to /tmp/become-agent-debug.log and enables GIT_TRACE, GH_DEBUG
-DEBUG_LOG="/tmp/become-agent-debug.log"
 if [[ -n "${BECOME_AGENT_DEBUG:-}" ]]; then
-    exec 3>>"$DEBUG_LOG"
-    dbg() { echo "[$(date '+%H:%M:%S.%N')] $*" >&3; }
-    dbg "=== become-agent starting (pid=$$) ==="
-    dbg "caller: $(ps -o comm= -p $PPID 2>/dev/null || echo unknown)"
-    dbg "args: $*"
-    # Enable tool-level debug logging
-    export GIT_TRACE=/tmp/become-agent-git-trace.log
-    export GH_DEBUG=1
-else
-    dbg() { :; }
+    exec 3>/tmp/become-agent-debug.log
+    BASH_XTRACEFD=3
+    PS4='+ [$(date "+%H:%M:%S")] '
+    set -x
 fi
+set -euo pipefail
+dbg() { [[ -n "${BECOME_AGENT_DEBUG:-}" ]] && echo "[$(date '+%H:%M:%S')] $*" >&3 || :; }
 
 AGENT_USER="${1:-claude-agent}"
 shift 2>/dev/null || true
@@ -77,4 +68,4 @@ dbg "exec sudo -u ${AGENT_USER} ... $*"
 exec sudo -u "${AGENT_USER}" \
     --set-home \
     "--preserve-env=${PRESERVE_ENV}" \
-    -- env "PATH=${AGENT_PATH}" "$@"
+    -- env "PATH=${AGENT_PATH}" "GH_HOST=github.netflix.net" "$@"

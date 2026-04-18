@@ -3,6 +3,13 @@
 # Run as: sudo -u claude-agent bash ~/dotfiles/bin/setup-agent-home.sh
 #
 # Can be re-run safely to update config.
+#
+# Prerequisites (run as primary user once):
+#   # Redirect screenshots to ~/Screenshots so the agent can read them
+#   mkdir -p ~/Screenshots
+#   defaults write com.apple.screencapture location ~/Screenshots
+#   killall SystemUIServer
+#   chmod +a "claude-agent allow read,readattr,readextattr,readsecurity,list,search,execute,file_inherit,directory_inherit" ~/Screenshots
 
 set -euo pipefail
 
@@ -58,16 +65,10 @@ make_link "${AGENT_HOME}/.claude/plugins" "${PRIMARY_HOME}/.claude/plugins"
 # Statsig — share feature flags/trust state
 make_link "${AGENT_HOME}/.claude/statsig" "${PRIMARY_HOME}/.claude/statsig"
 
-# MCP config — agent-specific overrides (e.g. Playwright needs Chrome wrapper)
-# Not symlinked because agent needs different browser launch config.
-cat > "${AGENT_HOME}/.claude/mcp.json" <<'MCPJSON'
-{
-  "playwright": {
-    "command": "npx",
-    "args": ["@playwright/mcp@latest", "--executable-path", "/Users/claude-agent/.local/bin/chromium-playwright"]
-  }
-}
-MCPJSON
+# Playwright MCP (from the enabled playwright plugin) is steered to our
+# chromium-playwright wrapper via the PLAYWRIGHT_MCP_EXECUTABLE_PATH env var
+# set in settings.json below — ~/.claude/mcp.json is not a supported config
+# location and was being ignored.
 
 # Share trust state and project onboarding (stored in ~/.claude.json)
 make_link "${AGENT_HOME}/.claude.json" "${PRIMARY_HOME}/.claude.json"
@@ -111,7 +112,8 @@ cat > "${AGENT_HOME}/.claude/settings.json" <<'SETTINGS'
     "OTEL_LOGS_EXPORT_INTERVAL": "5000",
     "OTEL_METRICS_EXPORTER": "otlp",
     "OTEL_METRIC_EXPORT_INTERVAL": "10000",
-    "OTEL_RESOURCE_ATTRIBUTES": "user.netflix_email=jimhester@netflix.com,runtime_environment=local,wrapper.version=2604021846"
+    "OTEL_RESOURCE_ATTRIBUTES": "user.netflix_email=jimhester@netflix.com,runtime_environment=local,wrapper.version=2604021846",
+    "PLAYWRIGHT_MCP_EXECUTABLE_PATH": "/Users/claude-agent/.local/bin/chromium-playwright"
   },
   "extraKnownMarketplaces": {
     "ngp-skills": {
@@ -218,6 +220,10 @@ cat > "${AGENT_HOME}/.gitconfig" <<GITCONFIG
     pushf = push --force-with-lease
 GITCONFIG
 
+# --- nflxlog cache (share primary user's cached binary to avoid sudo install) ---
+echo "Setting up nflxlog cache..."
+make_link "${AGENT_HOME}/.nflxlog-cache" "${PRIMARY_HOME}/.nflxlog-cache"
+
 # --- Metatron certs (mTLS auth for Netflix services, gh, git) ---
 echo "Setting up metatron..."
 make_link "${AGENT_HOME}/.metatron" "${PRIMARY_HOME}/.metatron"
@@ -275,6 +281,11 @@ export PATH="$HOME/.local/bin:/opt/nflx/bin:/opt/homebrew/bin:/opt/homebrew/sbin
 # Claude Code settings
 export ENABLE_INCREMENTAL_TUI=true
 export CLAUDE_CODE_EFFORT_LEVEL=max
+
+# gh CLI: default to GitHub Enterprise — nearly all work on this machine is
+# internal. Per-repo remote detection still takes priority over GH_HOST, so
+# this only changes the fallback for commands without a repo context.
+export GH_HOST=github.netflix.net
 
 # llm-panel: override stale defaults (nf-gemini-pro doesn't exist)
 export LLM_PANEL_MODELS="nflx/gpt-5.2,nflx/claude-opus-4-6,nflx/gemini-3.1-pro-preview"
