@@ -26,6 +26,8 @@ export ENABLE_INCREMENTAL_TUI=true
 
 # Claude Code: use max effort by default (only valid for Opus)
 export CLAUDE_CODE_EFFORT_LEVEL=max
+export CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING=1
+export MAX_THINKING_TOKENS=127999
 
 # Disable Vercel plugin telemetry in Claude Code
 export VERCEL_PLUGIN_TELEMETRY=off
