@@ -114,8 +114,13 @@ return {
         filetypes = { "lua" },
         root_markers = { ".luarc.json", ".luarc.jsonc", ".git" },
       })
+      -- Run the R languageserver package directly rather than a bare
+      -- "r-languageserver" launcher. The bare name resolved via "." in PATH to a
+      -- cloned launcher repo whose git calls corrupted unrelated git indices
+      -- (see docs/r-lsp-git-index-corruption.md). Requires the R package:
+      -- R -e 'install.packages("languageserver")'.
       vim.lsp.config("r_language_server", {
-        cmd = { "r-languageserver" },
+        cmd = { "R", "--slave", "-e", "languageserver::run()" },
         filetypes = { "r", "rmd" },
         root_markers = { "DESCRIPTION", ".Rproj", ".git" },
       })

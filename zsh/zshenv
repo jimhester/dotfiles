@@ -3,7 +3,11 @@ setopt no_global_rcs
 # Cross-platform PATH setup
 if [[ "$OSTYPE" == darwin* ]]; then
     # macOS with Homebrew
-    export PATH=.:$HOME/bin:/opt/nflx/bin:$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/opt/ccache/libexec:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:./node_modules/.bin:$HOME/Library/Python/3.7/bin
+    # NOTE: do NOT add "." or "./node_modules/.bin" to PATH. A relative entry
+    # lets a bare command (e.g. r-languageserver) resolve to a binary in the
+    # current directory, which corrupted git indices. See
+    # docs/r-lsp-git-index-corruption.md.
+    export PATH=$HOME/bin:/opt/nflx/bin:$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/opt/ccache/libexec:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/Library/TeX/texbin:$HOME/Library/Python/3.7/bin
     export HOMEBREW_PREFIX="/opt/homebrew"
     export HOMEBREW_CELLAR="/opt/homebrew/Cellar"
     export HOMEBREW_REPOSITORY="/opt/homebrew"
@@ -11,7 +15,7 @@ if [[ "$OSTYPE" == darwin* ]]; then
     export INFOPATH="/opt/homebrew/share/info:${INFOPATH:-}"
 else
     # Linux/WSL
-    export PATH=.:$HOME/bin:$HOME/.local/bin:$HOME/.local/share/nvim/mason/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:./node_modules/.bin
+    export PATH=$HOME/bin:$HOME/.local/bin:$HOME/.local/share/nvim/mason/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 fi
 #history base for per directory history
 export HISTORY_BASE=$HOME/.directory_history
