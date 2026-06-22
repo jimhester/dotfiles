@@ -1,7 +1,10 @@
 #!/bin/bash
 # Run a command as the claude-agent user.
-# Usage: become-agent <user> [command ...]
+# Usage: become-agent [--browser] <user> [command ...]
 #        become-agent <user>              # defaults to: claude --permission-mode auto --effort max
+#        become-agent --browser           # also start a headed CDP Chrome and point
+#                                          # the agent's Playwright MCP at it (for
+#                                          # Meechum/SSO-authenticated automation)
 #
 # Requires sudoers entry: jimhester ALL=(claude-agent) NOPASSWD: SETENV: ALL
 
@@ -13,6 +16,20 @@ if [[ -n "${BECOME_AGENT_DEBUG:-}" ]]; then
 fi
 set -euo pipefail
 dbg() { [[ -n "${BECOME_AGENT_DEBUG:-}" ]] && echo "[$(date '+%H:%M:%S')] $*" >&3 || :; }
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Parse our own wrapper flags — only as LEADING args, before <user>/command, so
+# a --browser meant for the downstream command is never consumed. Use `--` to
+# end wrapper-flag parsing explicitly.
+BROWSER_MODE=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --browser) BROWSER_MODE=1; shift ;;
+        --)        shift; break ;;
+        *)         break ;;
+    esac
+done
 
 AGENT_USER="${1:-claude-agent}"
 shift 2>/dev/null || true
@@ -53,6 +70,32 @@ if [[ -z "${GH_ENTERPRISE_TOKEN:-}" ]]; then
     if [[ -z "$GH_ENTERPRISE_TOKEN" ]]; then
         dbg "WARNING: could not read gh token (keychain locked?). gh commands may fail."
     fi
+fi
+
+# Browser mode: start (or reuse) a headed CDP Chrome as the primary user — who
+# has the GUI session — BEFORE dropping to the agent, then hand the agent the
+# endpoint. Only --browser may set PLAYWRIGHT_MCP_CDP_ENDPOINT: scrub any
+# inherited value otherwise so a stray env var can't silently flip the agent
+# into connect mode. This is an intentional trust elevation (the agent can act
+# as you in that browser) — see docs/claude-agent-browser-automation.md.
+unset PLAYWRIGHT_MCP_CDP_ENDPOINT 2>/dev/null || true
+if [[ -n "${BROWSER_MODE}" ]]; then
+    if ! "${SCRIPT_DIR}/chrome-debug-session"; then
+        echo "ERROR: --browser requested but chrome-debug-session failed." >&2
+        exit 1
+    fi
+    # chrome-debug-session uses a random port; read the one Chrome chose.
+    PROFILE_DIR="${CHROME_DEBUG_PROFILE:-${HOME}/.cache/claude-agent-chrome}"
+    CDP_PORT=""
+    [[ -f "${PROFILE_DIR}/DevToolsActivePort" ]] && \
+        IFS= read -r CDP_PORT < "${PROFILE_DIR}/DevToolsActivePort" || true
+    if [[ -z "${CDP_PORT}" ]]; then
+        echo "ERROR: could not read CDP port from ${PROFILE_DIR}/DevToolsActivePort." >&2
+        exit 1
+    fi
+    export PLAYWRIGHT_MCP_CDP_ENDPOINT="http://127.0.0.1:${CDP_PORT}"
+    PRESERVE_ENV="${PRESERVE_ENV},PLAYWRIGHT_MCP_CDP_ENDPOINT"
+    dbg "browser mode: CDP=${PLAYWRIGHT_MCP_CDP_ENDPOINT}"
 fi
 
 # sudo resets PATH to secure defaults regardless of --preserve-env,

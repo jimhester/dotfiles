@@ -1,0 +1,182 @@
+#!/bin/bash
+# Launch a headed, persistent-profile Chrome with CDP remote debugging so a
+# sandboxed claude-agent (or any local Playwright client) can drive an
+# *authenticated* browser session — e.g. one logged in through Meechum
+# (Netflix SSO) interactively.
+#
+# WHY THIS EXISTS
+#   The claude-agent sandbox user has no macOS GUI / WindowServer session, so it
+#   can never display a window to complete an interactive SSO login, and the
+#   default Playwright path uses chrome-headless-shell with a throwaway profile.
+#   This runs a real, visible browser as YOUR primary user (who owns the GUI
+#   session) with a persistent profile, then exposes it over CDP on localhost.
+#   The agent connects to that endpoint — the "browser on the host, sandbox
+#   connects via CDP" model sandvault uses.
+#
+# ⚠ TRUST BOUNDARY
+#   Connecting the agent to this browser is an INTENTIONAL privilege elevation,
+#   not a sandbox-preserving feature. Chrome runs as your primary user, and CDP
+#   is full browser control: whatever holds the endpoint can dump cookies
+#   (including HttpOnly), read session tokens, read file:// paths you can read,
+#   and act as you on any logged-in site. Treat `--browser` mode as handing the
+#   agent a logged-in browser. Mitigations here (random port, 0700 profile,
+#   localhost bind) reduce casual/accidental exposure and port-squatting — they
+#   do NOT contain a compromised agent on the same host.
+#
+# USAGE
+#   Run as your primary GUI user (jimhester), NOT as claude-agent.
+#     chrome-debug-session            # start (or reuse) the session
+#     chrome-debug-session --stop     # quit the tracked session
+#   From a Claude Code session running as YOUR normal user you can launch it
+#   with the `!` prefix. Do NOT use `!` from inside a claude-agent session —
+#   there it runs as claude-agent, which has no GUI and cannot show a window.
+#
+#   `become-agent --browser` starts this for you and wires the agent to it.
+#   Log into Meechum once in the window; the dedicated profile keeps the session.
+#
+# ENV
+#   CHROME_DEBUG_PORT     CDP port (default 0 = Chrome picks a random free port,
+#                         written to DevToolsActivePort in the profile dir)
+#   CHROME_DEBUG_PROFILE  user-data-dir (default ~/.cache/claude-agent-chrome)
+
+set -euo pipefail
+umask 077
+
+PROFILE_DIR="${CHROME_DEBUG_PROFILE:-$HOME/.cache/claude-agent-chrome}"
+REQ_PORT="${CHROME_DEBUG_PORT:-0}"
+PIDFILE="${PROFILE_DIR}/chrome-debug.pid"
+PORTFILE="${PROFILE_DIR}/DevToolsActivePort"
+
+if ! [[ "${REQ_PORT}" =~ ^[0-9]{1,5}$ ]] || (( REQ_PORT > 65535 )); then
+    echo "ERROR: CHROME_DEBUG_PORT must be 0 or a TCP port 1-65535 (got '${REQ_PORT}')." >&2
+    exit 1
+fi
+
+hint() {
+    local p="$1"
+    echo "  Connect the agent:  become-agent --browser"
+    echo "  CDP endpoint:       http://127.0.0.1:${p}"
+    echo "  Stop the session:   chrome-debug-session --stop"
+}
+
+# First line of DevToolsActivePort is the (possibly random) port Chrome chose.
+resolved_port() {
+    local p=""
+    [[ -f "${PORTFILE}" ]] && IFS= read -r p < "${PORTFILE}" || true
+    printf '%s' "${p}"
+}
+
+# Is the Chrome we launched still alive and owned by us?
+session_alive() {
+    local pid=""
+    [[ -f "${PIDFILE}" ]] && IFS= read -r pid < "${PIDFILE}" || true
+    [[ -n "${pid}" ]] || return 1
+    ps -o user= -p "${pid}" 2>/dev/null | grep -qx "$(id -un)" || return 1
+    return 0
+}
+
+# --- stop subcommand ---
+if [[ "${1:-}" == "--stop" ]]; then
+    pid=""
+    [[ -f "${PIDFILE}" ]] && IFS= read -r pid < "${PIDFILE}" || true
+    if session_alive; then
+        kill "${pid}" 2>/dev/null || true
+        echo "Stopped chrome debug session (pid ${pid})."
+    else
+        echo "No tracked chrome debug session running."
+    fi
+    rm -f "${PIDFILE}"
+    exit 0
+fi
+
+# --- secure the profile dir (it holds live cookies/tokens) ---
+if [[ -L "${PROFILE_DIR}" ]]; then
+    echo "ERROR: ${PROFILE_DIR} is a symlink; refusing to use it." >&2
+    exit 1
+fi
+mkdir -p "${PROFILE_DIR}"
+if [[ ! -O "${PROFILE_DIR}" ]]; then
+    echo "ERROR: ${PROFILE_DIR} is not owned by $(id -un); refusing." >&2
+    exit 1
+fi
+chmod 700 "${PROFILE_DIR}"
+
+# Single-launch lock (guards the check->launch window against concurrent runs).
+LOCKDIR="${PROFILE_DIR}/.launch.lock"
+if ! mkdir "${LOCKDIR}" 2>/dev/null; then
+    echo "ERROR: another chrome-debug-session launch is in progress (${LOCKDIR})." >&2
+    exit 1
+fi
+trap 'rmdir "${LOCKDIR}" 2>/dev/null || true' EXIT
+
+# --- reuse only a verified existing session (ours, alive, answering CDP) ---
+if session_alive; then
+    port="$(resolved_port)"
+    if [[ -n "${port}" ]] && curl -fsS --max-time 1 "http://127.0.0.1:${port}/json/version" >/dev/null 2>&1; then
+        echo "Chrome debug session already running."
+        echo "  Profile: ${PROFILE_DIR}"
+        hint "${port}"
+        exit 0
+    fi
+fi
+# Not alive / not answering — clear stale state before relaunch.
+rm -f "${PIDFILE}" "${PORTFILE}" 2>/dev/null || true
+
+# Find a headed browser. Prefer real Google Chrome (best for Okta/WebAuthn);
+# fall back to Playwright's full (non-headless) chromium.
+CHROME=""
+if [[ -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]]; then
+    CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+else
+    for dir in "$HOME"/Library/Caches/ms-playwright/chromium-*/; do
+        candidate="${dir}chrome-mac/Chromium.app/Contents/MacOS/Chromium"
+        [[ -x "$candidate" ]] && CHROME="$candidate"
+    done
+fi
+if [[ -z "$CHROME" ]]; then
+    echo "ERROR: no headed Chrome/Chromium found." >&2
+    echo "Install Google Chrome, or run: npx playwright install chromium" >&2
+    exit 1
+fi
+
+echo "Launching headed Chrome for agent browser automation:"
+echo "  Browser: ${CHROME}"
+echo "  Profile: ${PROFILE_DIR}   (dedicated, mode 0700; not your daily profile)"
+echo "  ⚠ Connecting the agent to this browser lets it act as you on any site"
+echo "    you log into here. Quit it (chrome-debug-session --stop) when done."
+echo
+
+# --remote-debugging-port=0 -> random free port (not a fixed scan target);
+# --remote-debugging-address pins the listener to loopback explicitly;
+# --user-data-dir MUST be non-default (Chrome 136+ refuses debugging on the
+# default profile, and the dedicated dir is the security boundary).
+"$CHROME" \
+    --remote-debugging-address=127.0.0.1 \
+    --remote-debugging-port="${REQ_PORT}" \
+    --user-data-dir="${PROFILE_DIR}" \
+    --no-first-run \
+    --no-default-browser-check \
+    >/dev/null 2>&1 &
+CHROME_PID=$!
+printf '%s\n' "${CHROME_PID}" > "${PIDFILE}"
+chmod 600 "${PIDFILE}"
+
+# Wait for Chrome to write its port and answer CDP.
+for _ in $(seq 1 30); do
+    port="$(resolved_port)"
+    if [[ -n "${port}" ]] && curl -fsS --max-time 1 "http://127.0.0.1:${port}/json/version" >/dev/null 2>&1; then
+        echo "Ready (pid ${CHROME_PID}). Log into Meechum in the window that opened, then:"
+        hint "${port}"
+        exit 0
+    fi
+    if ! kill -0 "${CHROME_PID}" 2>/dev/null; then
+        echo "ERROR: Chrome exited during startup." >&2
+        rm -f "${PIDFILE}"
+        exit 1
+    fi
+    sleep 1
+done
+
+echo "ERROR: Chrome did not expose a CDP endpoint within 30s." >&2
+rm -f "${PIDFILE}"
+exit 1

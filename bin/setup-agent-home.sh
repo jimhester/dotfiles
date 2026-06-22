@@ -69,6 +69,13 @@ make_link "${AGENT_HOME}/.claude/statsig" "${PRIMARY_HOME}/.claude/statsig"
 # chromium-playwright wrapper via the PLAYWRIGHT_MCP_EXECUTABLE_PATH env var
 # set in settings.json below — ~/.claude/mcp.json is not a supported config
 # location and was being ignored.
+#
+# Default: headless chrome-headless-shell launched via that wrapper (no creds).
+# Authenticated/Meechum mode: launch `become-agent --browser`, which starts a
+# headed CDP Chrome as the primary user and sets PLAYWRIGHT_MCP_CDP_ENDPOINT in
+# the agent's env. @playwright/mcp reads that var and CONNECTS to the running
+# browser instead of launching, so the agent drives your interactively-logged-in
+# session. See bin/chrome-debug-session and docs/claude-agent-browser-automation.md.
 
 # Share trust state and project onboarding (stored in ~/.claude.json)
 make_link "${AGENT_HOME}/.claude.json" "${PRIMARY_HOME}/.claude.json"
