@@ -32,7 +32,11 @@ alias showmd='grip'
 alias t='todo.sh'
 alias ta='todo.sh add'
 alias tl='todo.sh list'
+# clc: sandboxed claude-agent (headless browser). clcb: same + a headed Chrome
+# for authenticated/Meechum browser automation (opt-in trust elevation; see
+# docs/claude-agent-browser-automation.md). mclc: local claude as this user.
 alias clc='become-agent claude-agent claude --permission-mode auto --effort max'
+alias clcb='become-agent --browser claude-agent claude --permission-mode auto --effort max'
 alias mclc='ANTHROPIC_BASE_URL= CLAUDE_CODE_ENABLE_TELEMETRY= CLAUDE_CODE_SUBAGENT_MODEL= OTEL_EXPORTER_OTLP_ENDPOINT= /opt/homebrew/bin/claude --permission-mode auto --effort max'
 
 # Delete key on tmux OSX
