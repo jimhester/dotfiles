@@ -83,8 +83,12 @@ else
     echo "Work repo already exists at $WORK_REPO"
 fi
 
-# Work script for Claude Code
-make_link ~/.local/bin/work "$WORK_REPO/work"
+# Herdr/Codex task launcher. Do not install a `work` command: Netflix provides
+# its own agent-oriented command with that name.
+make_link ~/.local/bin/workon "$DOTFILES_DIR/bin/workon"
+
+# Codex skill for dispatching tasks through workon.
+make_link ~/.codex/skills/workon "$DOTFILES_DIR/codex/skills/workon"
 
 # become-agent: run commands as limited claude-agent user
 make_link ~/.local/bin/become-agent "$DOTFILES_DIR/bin/become-agent"
@@ -98,12 +102,6 @@ make_link ~/.local/bin/llm "$DOTFILES_DIR/zsh/bin/llm"
 
 # Claude Code config
 make_link ~/.claude/CLAUDE.md "$DOTFILES_DIR/claude/CLAUDE.md"
-
-# Claude Code skills
-make_link ~/.claude/skills/work "$WORK_REPO/skills/work"
-
-# Claude Code hooks for auto-detecting work stages
-"$WORK_REPO/hooks/install-hooks.sh"
 
 # Git config
 git config --global core.excludesfile "$DOTFILES_DIR/.gitignore"

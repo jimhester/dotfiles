@@ -1,0 +1,331 @@
+#!/usr/bin/env python3
+"""Start a Codex task in a Herdr-managed git worktree."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, NoReturn
+
+
+@dataclass
+class Task:
+    label: str
+    branch: str
+    prompt: str
+
+
+def fail(message: str) -> NoReturn:
+    print(f"workon: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def run(
+    args: list[str], *, cwd: Path | None = None, check: bool = True
+) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            args,
+            cwd=cwd,
+            check=check,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        fail(f"required command not found: {args[0]}")
+    except subprocess.CalledProcessError as error:
+        detail = (error.stderr or error.stdout or str(error)).strip()
+        fail(f"{' '.join(args[:2])} failed: {detail}")
+
+
+def run_json(args: list[str], *, cwd: Path | None = None) -> dict[str, Any]:
+    result = run(args, cwd=cwd)
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        fail(f"expected JSON from {' '.join(args[:2])}: {result.stdout.strip()}")
+
+
+def git_output(repo: Path, *args: str, check: bool = True) -> str:
+    return run(["git", *args], cwd=repo, check=check).stdout.strip()
+
+
+def repository_root() -> Path:
+    result = run(["git", "rev-parse", "--show-toplevel"], check=False)
+    if result.returncode != 0:
+        fail("run this command inside a git repository")
+    checkout = Path(result.stdout.strip()).resolve()
+
+    # When invoked from a linked worktree, create siblings from the main checkout.
+    common_dir = git_output(
+        checkout, "rev-parse", "--path-format=absolute", "--git-common-dir"
+    )
+    common = Path(common_dir)
+    if common.name == ".git" and common.parent.is_dir():
+        return common.parent.resolve()
+    return checkout
+
+
+def slugify(value: str, limit: int = 52) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    slug = slug[:limit].rstrip("-")
+    return slug or "task"
+
+
+def github_cli(task_ref: str, repo: Path) -> str:
+    origin = git_output(repo, "remote", "get-url", "origin", check=False)
+    if (
+        "github.netflix.net" in task_ref or "github.netflix.net" in origin
+    ) and shutil.which("ghe"):
+        return "ghe"
+    return "gh"
+
+
+def github_task(task_ref: str, repo: Path, repo_name: str | None) -> Task | None:
+    issue_number: str | None = None
+    issue_url: str | None = None
+
+    if task_ref.isdigit():
+        issue_number = task_ref
+    else:
+        match = re.fullmatch(r"https?://[^/]+/[^/]+/[^/]+/issues/(\d+)/?", task_ref)
+        if match:
+            issue_number = match.group(1)
+            issue_url = task_ref.rstrip("/")
+
+    if not issue_number:
+        return None
+
+    command = [
+        github_cli(task_ref, repo),
+        "issue",
+        "view",
+        issue_url or issue_number,
+        "--json",
+        "number,title,url",
+    ]
+    if repo_name and not issue_url:
+        command.extend(["--repo", repo_name])
+    issue = run_json(command)
+    number = int(issue["number"])
+    title = issue["title"]
+    url = issue["url"]
+    label = f"#{number} {title}"
+    return Task(
+        label=label,
+        branch=f"issue-{number}-{slugify(title)}",
+        prompt=(
+            f"Complete GitHub issue {url} end-to-end. Read the repository's "
+            "AGENTS.md and other local instructions first. Understand the issue, "
+            "implement and test the change, and create a pull request when ready."
+        ),
+    )
+
+
+def jira_task(task_ref: str) -> Task | None:
+    if not re.fullmatch(r"[A-Z][A-Z0-9]+-\d+", task_ref):
+        return None
+    if not shutil.which("acli"):
+        return Task(
+            label=task_ref,
+            branch=task_ref,
+            prompt=f"Complete Jira issue {task_ref} end-to-end.",
+        )
+
+    issue = run_json(["acli", "jira", "workitem", "view", task_ref, "--json"])
+    title = issue.get("fields", {}).get("summary") or task_ref
+    return Task(
+        label=f"{task_ref} {title}",
+        branch=f"{task_ref}-{slugify(title)}",
+        prompt=(
+            f"Complete Jira issue {task_ref} end-to-end. Read the repository's "
+            "AGENTS.md and other local instructions first. Fetch the issue details, "
+            "implement and test the change, and create a pull request when ready."
+        ),
+    )
+
+
+def resolve_task(task_ref: str, repo: Path, repo_name: str | None) -> Task:
+    task = github_task(task_ref, repo, repo_name) or jira_task(task_ref)
+    if task:
+        return task
+    return Task(
+        label=task_ref,
+        branch=f"task-{slugify(task_ref)}",
+        prompt=(
+            f"Complete this task end-to-end: {task_ref}\n\n"
+            "Read the repository's AGENTS.md and other local instructions first. "
+            "Implement and test the change, and create a pull request when ready."
+        ),
+    )
+
+
+def default_base(repo: Path) -> str:
+    remote_head = git_output(
+        repo,
+        "symbolic-ref",
+        "--quiet",
+        "--short",
+        "refs/remotes/origin/HEAD",
+        check=False,
+    )
+    if remote_head:
+        return remote_head
+    for candidate in ("origin/main", "origin/master", "main", "master"):
+        if (
+            run(
+                ["git", "rev-parse", "--verify", "--quiet", candidate],
+                cwd=repo,
+                check=False,
+            ).returncode
+            == 0
+        ):
+            return candidate
+    fail("could not determine the base branch; pass --base")
+
+
+def find_worktree(repo: Path, branch: str) -> Path | None:
+    output = git_output(repo, "worktree", "list", "--porcelain")
+    path: Path | None = None
+    for line in output.splitlines():
+        if line.startswith("worktree "):
+            path = Path(line.removeprefix("worktree "))
+        elif line == f"branch refs/heads/{branch}":
+            return path
+    return None
+
+
+def find_value(value: Any, key: str) -> str | None:
+    if isinstance(value, dict):
+        if isinstance(value.get(key), str):
+            return value[key]
+        for child in value.values():
+            found = find_value(child, key)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = find_value(child, key)
+            if found:
+                return found
+    return None
+
+
+def open_workspace(
+    repo: Path, task: Task, base: str, focus: bool
+) -> tuple[str, str, bool, str]:
+    existing = find_worktree(repo, task.branch)
+    focus_flag = "--focus" if focus else "--no-focus"
+    if existing:
+        command = [
+            "herdr",
+            "worktree",
+            "open",
+            "--cwd",
+            str(repo),
+            "--path",
+            str(existing),
+            "--label",
+            task.label,
+            focus_flag,
+            "--json",
+        ]
+    else:
+        command = [
+            "herdr",
+            "worktree",
+            "create",
+            "--cwd",
+            str(repo),
+            "--branch",
+            task.branch,
+            "--base",
+            base,
+            "--label",
+            task.label,
+            focus_flag,
+            "--json",
+        ]
+    response = run_json(command)
+    pane_id = find_value(response, "pane_id")
+    workspace_id = find_value(response, "workspace_id")
+    if not pane_id or not workspace_id:
+        fail(f"Herdr did not return a pane and workspace: {response}")
+    result = response.get("result", {})
+    already_open = bool(result.get("already_open"))
+    agent_status = find_value(result.get("root_pane", {}), "agent_status") or "unknown"
+    return pane_id, workspace_id, already_open, agent_status
+
+
+def parser() -> argparse.ArgumentParser:
+    result = argparse.ArgumentParser(
+        description="Start a Codex task in a Herdr-managed git worktree."
+    )
+    result.add_argument(
+        "task", nargs="+", help="issue number, issue URL, Jira key, or task"
+    )
+    result.add_argument("--repo", help="GitHub OWNER/REPO for a numeric issue")
+    result.add_argument(
+        "--base", help="base ref for a new branch (default: remote HEAD)"
+    )
+    result.add_argument(
+        "--no-focus", action="store_true", help="create the workspace in the background"
+    )
+    result.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="show the resolved launch without changing anything",
+    )
+    return result
+
+
+def main() -> None:
+    args = parser().parse_args()
+    repo = repository_root()
+    task_ref = " ".join(args.task)
+    task = resolve_task(task_ref, repo, args.repo)
+    base = args.base or default_base(repo)
+
+    if args.dry_run:
+        print(json.dumps({"repo": str(repo), "base": base, **task.__dict__}, indent=2))
+        return
+
+    if not shutil.which("herdr"):
+        fail("herdr is not installed or not on PATH")
+    if not shutil.which("codex"):
+        fail("codex is not installed or not on PATH")
+
+    pane_id, workspace_id, already_open, agent_status = open_workspace(
+        repo, task, base, not args.no_focus
+    )
+    if already_open and agent_status != "unknown":
+        print(
+            f"Already open with Codex ({agent_status}): {task.label} ({workspace_id})"
+        )
+        return
+
+    print(f"Starting Codex in {task.branch} ({workspace_id})")
+    run(
+        [
+            "herdr",
+            "agent",
+            "start",
+            task.label,
+            "--kind",
+            "codex",
+            "--pane",
+            pane_id,
+        ]
+    )
+    run(["herdr", "agent", "prompt", pane_id, task.prompt])
+    print(f"Dispatched: {task.label}")
+
+
+if __name__ == "__main__":
+    main()

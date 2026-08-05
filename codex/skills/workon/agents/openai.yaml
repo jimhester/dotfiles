@@ -1,0 +1,4 @@
+interface:
+  display_name: "Work On"
+  short_description: "Dispatch coding tasks to Codex in Herdr"
+  default_prompt: "Use $workon to start a dedicated Codex agent for this issue."

@@ -1,6 +1,6 @@
 # Dotfiles
 
-Personal dotfiles with colemak support, solarized color scheme, and Claude Code tooling.
+Personal dotfiles with colemak support, solarized color scheme, and AI coding-agent tooling.
 
 ## Setup
 
@@ -10,12 +10,21 @@ cd ~/dotfiles
 ./setup.sh
 ```
 
-## Claude Code
+## AI coding agents
 
-The `genai/` directory contains tooling for Claude Code:
+`workon` starts Codex in a Herdr-managed git worktree:
 
-- **`work`** - Script to spawn isolated Claude Code sessions for GitHub issues using git worktrees
-- **`skills/work`** - Skill that teaches Claude when/how to use the work script
-- **`hooks/`** - Auto-detection hooks that update worker status based on workflow events (PR creation, CI, merges, conflicts)
+```bash
+workon 123                         # GitHub issue in the current repository
+workon AIE-123                     # Jira issue
+workon "add dark mode support"     # Free-form task
+workon --dry-run 123               # Show the branch and prompt only
+```
 
-See `genai/skills/work/SKILL.md` for usage details.
+Herdr owns worktree creation, workspaces, agent state, session restoration, and
+notifications. The launcher only resolves task metadata and starts Codex.
+
+The matching Codex skill teaches agents to dispatch issue work through `workon`
+and use Herdr for lifecycle management.
+
+The `work/` directory retains the older Claude Code tooling for compatibility.
