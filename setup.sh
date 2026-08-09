@@ -71,6 +71,9 @@ make_link ~/.dir_colors "$DOTFILES_DIR/dircolors/dircolors.ansi-light"
 # Make colemak directory link
 make_link ~/.colemak "$DOTFILES_DIR/colemak/"
 
+# Herdr config
+make_link ~/.config/herdr/config.toml "$DOTFILES_DIR/herdr/config.toml"
+
 # Clone work repo for Claude Code tooling
 WORK_REPO="$DOTFILES_DIR/work"
 if [[ ! -d "$WORK_REPO" ]]; then

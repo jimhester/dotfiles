@@ -1,0 +1,32 @@
+onboarding = false
+
+[theme]
+name = "solarized-light"
+
+[terminal]
+shell_mode = "login"
+
+[keys]
+prefix = "ctrl+space"
+
+# Colemak pane navigation, matching tmux.
+focus_pane_left = "prefix+h"
+focus_pane_down = "prefix+n"
+focus_pane_up = "prefix+e"
+focus_pane_right = "prefix+i"
+
+# Keep tab navigation off prefix+n, which is used for pane-down.
+previous_tab = ["prefix+[", "alt+left"]
+next_tab = ["prefix+]", "alt+right"]
+previous_workspace = "alt+up"
+next_workspace = "alt+down"
+
+# Match tmux's side-by-side and stacked split keys.
+split_vertical = "prefix+backslash"
+split_horizontal = "prefix+shift+minus"
+
+# Use the same Colemak directions in Herdr's navigation surface.
+navigate_pane_left = "h"
+navigate_pane_down = "n"
+navigate_pane_up = "e"
+navigate_pane_right = "i"
