@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -78,10 +79,31 @@ def slugify(value: str, limit: int = 52) -> str:
     return slug or "task"
 
 
+def agent_name(task: Task) -> str:
+    """Return a valid, stable Herdr agent name for a task.
+
+    Herdr names must start with a lowercase letter, contain only lowercase
+    letters, digits, hyphens, or underscores, and be at most 32 characters.
+    Preserve a hash suffix when truncating so tasks with similar long titles do
+    not collide.
+    """
+    normalized = re.sub(r"[^a-z0-9_-]+", "-", task.branch.lower()).strip("-_")
+    normalized = normalized or "task"
+    if not normalized[0].isalpha():
+        normalized = f"task-{normalized}"
+    if len(normalized) <= 32:
+        return normalized
+    digest = hashlib.sha256(normalized.encode()).hexdigest()[:6]
+    prefix = normalized[:25].rstrip("-_") or "task"
+    return f"{prefix}-{digest}"
+
+
 def github_cli(task_ref: str, repo: Path) -> str:
     origin = git_output(repo, "remote", "get-url", "origin", check=False)
     if (
-        "github.netflix.net" in task_ref or "github.netflix.net" in origin
+        "github.netflix.net" in task_ref
+        or "github.netflix.net" in origin
+        or "git.netflix.net" in origin
     ) and shutil.which("ghe"):
         return "ghe"
     return "gh"
@@ -102,28 +124,55 @@ def github_task(task_ref: str, repo: Path, repo_name: str | None) -> Task | None
     if not issue_number:
         return None
 
+    cli = github_cli(task_ref, repo)
+    view_target = issue_url or issue_number
+    if cli == "ghe" and repo_name and not issue_url:
+        view_target = f"https://github.netflix.net/{repo_name}/issues/{issue_number}"
+
     command = [
-        github_cli(task_ref, repo),
+        cli,
         "issue",
         "view",
-        issue_url or issue_number,
+        view_target,
         "--json",
-        "number,title,url",
+        "number,title,url,body,comments",
     ]
-    if repo_name and not issue_url:
+    if repo_name and not issue_url and cli != "ghe":
         command.extend(["--repo", repo_name])
     issue = run_json(command)
     number = int(issue["number"])
     title = issue["title"]
     url = issue["url"]
+    body = issue.get("body") or "(No issue body provided.)"
+    comments = issue.get("comments") or []
+    if comments:
+        formatted_comments = []
+        for comment in comments:
+            author = comment.get("author") or {}
+            author_name = author.get("login") or "unknown author"
+            created_at = comment.get("createdAt") or "unknown date"
+            comment_url = comment.get("url") or url
+            comment_body = comment.get("body") or "(Empty comment.)"
+            formatted_comments.append(
+                f"Comment by @{author_name} on {created_at} ({comment_url}):\n"
+                f"{comment_body}"
+            )
+        comment_context = "\n\n".join(formatted_comments)
+    else:
+        comment_context = "(No comments.)"
     label = f"#{number} {title}"
     return Task(
         label=label,
         branch=f"issue-{number}-{slugify(title)}",
         prompt=(
-            f"Complete GitHub issue {url} end-to-end. Read the repository's "
-            "AGENTS.md and other local instructions first. Understand the issue, "
-            "implement and test the change, and create a pull request when ready."
+            f"Complete GitHub issue {url} end-to-end.\n\n"
+            f"Issue title: {title}\n\n"
+            f"Issue body:\n{body}\n\n"
+            f"Issue comments (oldest to newest):\n{comment_context}\n\n"
+            "Read the repository's AGENTS.md and other local instructions first. "
+            "Use the issue body and full comment thread above when determining the "
+            "intended change. Implement and test the change, and create a pull "
+            "request when ready."
         ),
     )
 
@@ -293,7 +342,17 @@ def main() -> None:
     base = args.base or default_base(repo)
 
     if args.dry_run:
-        print(json.dumps({"repo": str(repo), "base": base, **task.__dict__}, indent=2))
+        print(
+            json.dumps(
+                {
+                    "repo": str(repo),
+                    "base": base,
+                    "agent_name": agent_name(task),
+                    **task.__dict__,
+                },
+                indent=2,
+            )
+        )
         return
 
     if not shutil.which("herdr"):
@@ -316,7 +375,7 @@ def main() -> None:
             "herdr",
             "agent",
             "start",
-            task.label,
+            agent_name(task),
             "--kind",
             "codex",
             "--pane",
