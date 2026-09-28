@@ -85,3 +85,5 @@ work/
 
 # Work tool temporary files
 .work-review-status
+
+**/.claude/settings.local.json

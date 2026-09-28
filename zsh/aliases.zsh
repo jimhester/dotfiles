@@ -39,5 +39,8 @@ alias clc='become-agent claude-agent claude --permission-mode auto --effort max'
 alias clcb='become-agent --browser claude-agent claude --permission-mode auto --effort max'
 alias mclc='ANTHROPIC_BASE_URL= CLAUDE_CODE_ENABLE_TELEMETRY= CLAUDE_CODE_SUBAGENT_MODEL= OTEL_EXPORTER_OTLP_ENDPOINT= /opt/homebrew/bin/claude --permission-mode auto --effort max'
 
+alias cdx='codex -a untrusted -s workspace-write -c sandbox_workspace_write.network_access=true'
+alias cdxd='codex --dangerously-bypass-approvals-and-sandbox'
+
 # Delete key on tmux OSX
 bindkey "^[[3~" delete-char
