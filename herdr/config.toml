@@ -30,3 +30,10 @@ navigate_pane_left = "h"
 navigate_pane_down = "n"
 navigate_pane_up = "e"
 navigate_pane_right = "i"
+
+# Forward Alt+Up to the focused pane without triggering workspace navigation.
+[[keys.command]]
+key = "prefix+up"
+type = "shell"
+command = '"$HERDR_BIN_PATH" pane send-keys "$HERDR_ACTIVE_PANE_ID" alt+up'
+description = "send Alt+Up to current pane"
