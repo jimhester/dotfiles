@@ -1,0 +1,76 @@
+model = "gpt-6.1-sol"
+model_reasoning_effort = "medium"
+approvals_reviewer = "auto_review"
+[projects."/home/jimhester/dotfiles"]
+trust_level = "trusted"
+
+[projects."/home/jimhester/p/tennis"]
+trust_level = "trusted"
+
+[projects."/home/jimhester"]
+trust_level = "trusted"
+
+[projects."/home/jimhester/p/karaoke"]
+trust_level = "trusted"
+
+[projects."/home/jimhester/p/pirates"]
+trust_level = "trusted"
+
+[projects."/home/jimhester/p/finances"]
+trust_level = "trusted"
+
+[projects."/tmp/claude-1000/-home-jimhester-p-finances/1c55f913-29f3-4834-b4b3-cb03a17e8050/scratchpad/medicare-task"]
+trust_level = "trusted"
+
+[projects."/mnt/c/Users/james/ssg"]
+trust_level = "trusted"
+
+[projects."/home/jimhester/p/chore_quest"]
+trust_level = "trusted"
+
+[projects."/home/jimhester/p/per-directory-history"]
+trust_level = "trusted"
+
+[projects."/home/jimhester/p/upscale"]
+trust_level = "trusted"
+
+[projects."/home/jimhester/p/tennis-scorekeeper"]
+trust_level = "trusted"
+
+[projects."/home/jimhester/p/vroom"]
+trust_level = "trusted"
+
+[projects."/home/jimhester/p/rec-tennis-player-db"]
+trust_level = "trusted"
+
+[tui]
+theme = "solarized-light"
+status_line = ["model-with-reasoning", "context-used", "current-dir"]
+screen_reader_detection_done = true
+
+[tui.model_availability_nux]
+"gpt-5.5" = 4
+"gpt-5.6-sol" = 4
+gpt-6-astra = 4
+"gpt-6.1-sol" = 4
+
+[mcp_servers.episodic-memory]
+command = "/home/jimhester/dotfiles/bin/episodic-memory-mcp.sh"
+
+[mcp_servers.pixellab]
+url = "https://api.pixellab.ai/mcp"
+bearer_token_env_var = "PIXELLAB_API_TOKEN"
+
+[plugins."github@openai-curated"]
+enabled = true
+
+[plugins."superpowers@openai-curated-remote"]
+enabled = false
+
+[features]
+hooks = true
+
+[hooks.state]
+
+[hooks.state."/home/jimhester/.codex/hooks.json:session_start:0:0"]
+trusted_hash = "sha256:71194130e57bece2a84fb1ebee99cdcfe702056accb99b076f2b2556b082fdcb"

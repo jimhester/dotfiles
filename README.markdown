@@ -28,3 +28,12 @@ The matching Codex skill teaches agents to dispatch issue work through `workon`
 and use Herdr for lifecycle management.
 
 The `work/` directory retains the older Claude Code tooling for compatibility.
+
+## Codex
+
+`setup.sh` links:
+
+- `~/.codex/config.toml` to `codex/config.toml`, including the episodic-memory MCP server
+- `~/.agents/skills/superpowers` to the local Superpowers skills
+- `~/.agents/skills/episodic-memory` and `~/.agents/agents/search-conversations.md` when `~/p/episodic-memory` is present
+

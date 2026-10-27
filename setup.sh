@@ -103,6 +103,30 @@ make_link ~/.local/bin/llm "$DOTFILES_DIR/zsh/bin/llm"
 # Claude Code config
 make_link ~/.claude/CLAUDE.md "$DOTFILES_DIR/claude/CLAUDE.md"
 
+# Codex config and skills
+make_link ~/.codex/config.toml "$DOTFILES_DIR/codex/config.toml"
+
+SUPERPOWERS_SKILLS=""
+if [[ -d "$HOME/.codex/superpowers/skills" ]]; then
+    SUPERPOWERS_SKILLS="$HOME/.codex/superpowers/skills"
+elif [[ -d "$HOME/.codex/.tmp/plugins/plugins/superpowers/skills" ]]; then
+    SUPERPOWERS_SKILLS="$HOME/.codex/.tmp/plugins/plugins/superpowers/skills"
+else
+    echo "Cloning superpowers for Codex..."
+    git clone https://github.com/obra/superpowers.git "$HOME/.codex/superpowers"
+    SUPERPOWERS_SKILLS="$HOME/.codex/superpowers/skills"
+fi
+
+make_link ~/.agents/skills/superpowers "$SUPERPOWERS_SKILLS"
+
+if [[ -d "$HOME/p/episodic-memory/skills" ]]; then
+    make_link ~/.agents/skills/episodic-memory "$HOME/p/episodic-memory/skills"
+fi
+
+if [[ -f "$HOME/p/episodic-memory/agents/search-conversations.md" ]]; then
+    make_link ~/.agents/agents/search-conversations.md "$HOME/p/episodic-memory/agents/search-conversations.md"
+fi
+
 # Git config
 git config --global core.excludesfile "$DOTFILES_DIR/.gitignore"
 git config --global user.name "Jim Hester"
