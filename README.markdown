@@ -12,7 +12,7 @@ cd ~/dotfiles
 
 ## AI coding agents
 
-`workon` starts Codex in a Herdr-managed git worktree:
+`workon` starts omp in a Herdr-managed git worktree:
 
 ```bash
 workon 123                         # GitHub issue in the current repository
@@ -22,9 +22,9 @@ workon --dry-run 123               # Show the branch and prompt only
 ```
 
 Herdr owns worktree creation, workspaces, agent state, session restoration, and
-notifications. The launcher only resolves task metadata and starts Codex.
+notifications. The launcher only resolves task metadata and starts omp.
 
-The matching Codex skill teaches agents to dispatch issue work through `workon`
+The `workon` Codex skill teaches agents to dispatch issue work through `workon`
 and use Herdr for lifecycle management.
 
 The `work/` directory retains the older Claude Code tooling for compatibility.

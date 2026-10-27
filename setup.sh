@@ -83,12 +83,12 @@ else
     echo "Work repo already exists at $WORK_REPO"
 fi
 
-# Herdr/Codex task launcher. Do not install a `work` command: Netflix provides
+# Herdr/omp task launcher. Do not install a `work` command: Netflix provides
 # its own agent-oriented command with that name.
 make_link ~/.local/bin/workon "$DOTFILES_DIR/bin/workon"
 
-# Codex skill for dispatching tasks through workon.
-make_link ~/.codex/skills/workon "$DOTFILES_DIR/codex/skills/workon"
+# workon skill for dispatching tasks; ~/.agents/skills is read by both omp and Codex.
+make_link ~/.agents/skills/workon "$DOTFILES_DIR/codex/skills/workon"
 
 # become-agent: run commands as limited claude-agent user
 make_link ~/.local/bin/become-agent "$DOTFILES_DIR/bin/become-agent"

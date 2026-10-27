@@ -1,12 +1,12 @@
 ---
 name: workon
-description: Dispatch GitHub issues, Jira issues, and free-form coding tasks to dedicated Codex agents in Herdr-managed git worktrees. Use when the user asks to work on, start, fix, or implement an issue; spin up a separate agent; launch coding work in another workspace; or dispatch multiple tasks in parallel. Do not dispatch when the user explicitly asks to work in the current session.
+description: Dispatch GitHub issues, Jira issues, and free-form coding tasks to dedicated omp agents in Herdr-managed git worktrees. Use when the user asks to work on, start, fix, or implement an issue; spin up a separate agent; launch coding work in another workspace; or dispatch multiple tasks in parallel. Do not dispatch when the user explicitly asks to work in the current session.
 ---
 
 # Work On
 
 Use `workon` from the repository that should receive the change. It resolves the
-task, creates or reopens a Herdr worktree workspace, starts Codex, and submits the
+task, creates or reopens a Herdr worktree workspace, starts omp, and submits the
 task prompt. Herdr owns agent status, notifications, and session restoration.
 
 ## Dispatch a task
@@ -32,7 +32,7 @@ that should receive the change. Change directories first when necessary.
 
 Use `--no-focus` to dispatch in the background. When dispatching multiple tasks,
 invoke `workon --no-focus` separately for each task so each gets its own worktree
-and Codex agent.
+and omp agent.
 
 Use `--dry-run` when the target, branch, or prompt needs verification before
 creating anything:
@@ -55,5 +55,5 @@ herdr workspace list
 herdr worktree list
 ```
 
-If a task worktree is already open with Codex, `workon` reuses and focuses that
+If a task worktree is already open with omp, `workon` reuses and focuses that
 workspace rather than starting a duplicate agent.

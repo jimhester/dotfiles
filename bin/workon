@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start a Codex task in a Herdr-managed git worktree."""
+"""Start an omp task in a Herdr-managed git worktree."""
 
 from __future__ import annotations
 
@@ -314,7 +314,7 @@ def open_workspace(
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(
-        description="Start a Codex task in a Herdr-managed git worktree."
+        description="Start an omp task in a Herdr-managed git worktree."
     )
     result.add_argument(
         "task", nargs="+", help="issue number, issue URL, Jira key, or task"
@@ -357,19 +357,19 @@ def main() -> None:
 
     if not shutil.which("herdr"):
         fail("herdr is not installed or not on PATH")
-    if not shutil.which("codex"):
-        fail("codex is not installed or not on PATH")
+    if not shutil.which("omp"):
+        fail("omp is not installed or not on PATH")
 
     pane_id, workspace_id, already_open, agent_status = open_workspace(
         repo, task, base, not args.no_focus
     )
     if already_open and agent_status != "unknown":
         print(
-            f"Already open with Codex ({agent_status}): {task.label} ({workspace_id})"
+            f"Already open with omp ({agent_status}): {task.label} ({workspace_id})"
         )
         return
 
-    print(f"Starting Codex in {task.branch} ({workspace_id})")
+    print(f"Starting omp in {task.branch} ({workspace_id})")
     run(
         [
             "herdr",
@@ -377,7 +377,7 @@ def main() -> None:
             "start",
             agent_name(task),
             "--kind",
-            "codex",
+            "omp",
             "--pane",
             pane_id,
         ]
