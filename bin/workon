@@ -365,11 +365,12 @@ def main() -> None:
     )
     if already_open and agent_status != "unknown":
         print(
-            f"Already open with omp ({agent_status}): {task.label} ({workspace_id})"
+            f"Already open with omp ({agent_status}): {task.label} "
+            f"(branch {task.branch}, workspace {workspace_id})"
         )
         return
 
-    print(f"Starting omp in {task.branch} ({workspace_id})")
+    print(f"Starting omp on branch {task.branch} (workspace {workspace_id})")
     run(
         [
             "herdr",
