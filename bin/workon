@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, NoReturn
@@ -312,6 +313,33 @@ def open_workspace(
     return pane_id, workspace_id, already_open, agent_status
 
 
+# A new worktree's pane is not at its shell prompt until the shell finishes
+# starting; Herdr refuses `agent start` with agent_pane_busy until then.
+PANE_READY_TIMEOUT = 20.0
+
+
+def start_agent(task: Task, pane_id: str) -> None:
+    command = [
+        "herdr",
+        "agent",
+        "start",
+        agent_name(task),
+        "--kind",
+        "omp",
+        "--pane",
+        pane_id,
+    ]
+    deadline = time.monotonic() + PANE_READY_TIMEOUT
+    while True:
+        result = run(command, check=False)
+        if result.returncode == 0:
+            return
+        detail = f"{result.stderr}\n{result.stdout}".strip()
+        if "agent_pane_busy" not in detail or time.monotonic() >= deadline:
+            fail(f"herdr agent failed: {detail}")
+        time.sleep(0.5)
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(
         description="Start an omp task in a Herdr-managed git worktree."
@@ -371,18 +399,7 @@ def main() -> None:
         return
 
     print(f"Starting omp on branch {task.branch} (workspace {workspace_id})")
-    run(
-        [
-            "herdr",
-            "agent",
-            "start",
-            agent_name(task),
-            "--kind",
-            "omp",
-            "--pane",
-            pane_id,
-        ]
-    )
+    start_agent(task, pane_id)
     run(["herdr", "agent", "prompt", pane_id, task.prompt])
     print(f"Dispatched: {task.label}")
 
