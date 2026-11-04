@@ -4,11 +4,17 @@
 
 `setup.sh` runs `bin/setup-episodic-memory`, which:
 
-- installs Homebrew `node@24` (macOS);
+- installs Homebrew `node@24` (macOS), then runs `brew upgrade node` if
+  Homebrew's `node` no longer starts (installing `node@24` can upgrade shared
+  deps such as `simdjson` without relinking it);
 - clones `jimhester/episodic-memory` (fork of `obra/episodic-memory` carrying
   the omp parser fixes below) to `~/p/episodic-memory` (override with
-  `EPISODIC_MEMORY_DIR`);
-- links `bin/episodic-memory` to `~/.local/bin/episodic-memory`;
+  `EPISODIC_MEMORY_DIR`). An existing checkout is left alone; `git pull` it
+  yourself;
+- links `bin/episodic-memory` to `~/.local/bin/episodic-memory` and warns about
+  any other `episodic-memory` on PATH. An old `npm link` runs under the default
+  Node (26), can't load the binding, and made every sync fail with
+  `ERR_DLOPEN_FAILED`; remove it with `npm rm -g episodic-memory`;
 - links `~/.omp/agent/hooks/post` to `omp/hooks/post`;
 - merges an `episodic-memory` stdio entry (`episodic-memory mcp`) into
   `~/.omp/agent/mcp.json`, leaving other servers alone.

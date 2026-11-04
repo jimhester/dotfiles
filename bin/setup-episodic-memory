@@ -27,6 +27,12 @@ make_link() {
 # better-sqlite3 does not compile on Node 26; the wrapper prefers node@24.
 if [[ "$OSTYPE" == darwin* ]]; then
   brew install node@24
+  # Installing node@24 can upgrade shared deps (e.g. simdjson) without
+  # relinking Homebrew's `node`, leaving it unable to start.
+  brew_node="$(brew --prefix)/opt/node/bin/node"
+  if [[ -x "$brew_node" ]] && ! "$brew_node" -v >/dev/null 2>&1; then
+    brew upgrade node
+  fi
 elif [[ -z "${EPISODIC_MEMORY_NODE:-}" ]]; then
   echo "Linux: install Node 20-25 and set EPISODIC_MEMORY_NODE if it is not node@24 from Homebrew or the default node." >&2
 fi
@@ -39,6 +45,14 @@ make_link "$WRAPPER" "$DOTFILES_DIR/bin/episodic-memory"
 
 # First run installs dependencies and builds the native binding.
 "$WRAPPER" --help >/dev/null
+
+# An `npm link`ed episodic-memory runs under the default Node, where the
+# native binding may not load; it must not shadow the wrapper.
+for bin in $(type -ap episodic-memory); do
+  if [[ "$bin" != "$WRAPPER" ]]; then
+    echo "warning: $bin shadows or duplicates $WRAPPER; remove it (e.g. npm rm -g episodic-memory)" >&2
+  fi
+done
 
 # omp skips symlinked hook files, so link the directory instead.
 make_link "$OMP_AGENT_DIR/hooks/post" "$DOTFILES_DIR/omp/hooks/post"
