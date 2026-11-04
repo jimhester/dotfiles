@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installs episodic-memory and wires it into Oh My Pi (omp):
-#   - clones obra/episodic-memory to $EPISODIC_MEMORY_DIR (default ~/p/episodic-memory)
+#   - clones jimhester/episodic-memory (obra fork with omp parser fixes) to $EPISODIC_MEMORY_DIR (default ~/p/episodic-memory)
 #   - links the bin/episodic-memory wrapper to ~/.local/bin
 #   - links omp/hooks/post (session_start/session_shutdown sync) into omp
 #   - registers the episodic-memory MCP server in omp's mcp.json
@@ -32,7 +32,7 @@ elif [[ -z "${EPISODIC_MEMORY_NODE:-}" ]]; then
 fi
 
 if [[ ! -d "$EM_DIR" ]]; then
-  git clone https://github.com/obra/episodic-memory.git "$EM_DIR"
+  git clone https://github.com/jimhester/episodic-memory.git "$EM_DIR"
 fi
 
 make_link "$WRAPPER" "$DOTFILES_DIR/bin/episodic-memory"
