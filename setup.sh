@@ -19,9 +19,9 @@ echo "Setting up dotfiles for $OS..."
 # Install packages
 echo "Installing packages..."
 if [[ "$OS" == "linux" ]]; then
-    sudo apt update && sudo apt install -y zsh neovim ripgrep fd-find
+    sudo apt update && sudo apt install -y zsh neovim ripgrep fd-find fzf jq
 else
-    brew install zsh neovim ripgrep fd
+    brew install zsh neovim ripgrep fd fzf jq
 fi
 
 # Install oh-my-zsh if not present
@@ -102,6 +102,9 @@ make_link ~/.local/bin/llm "$DOTFILES_DIR/zsh/bin/llm"
 
 # Claude Code config
 make_link ~/.claude/CLAUDE.md "$DOTFILES_DIR/claude/CLAUDE.md"
+
+# Episodic memory for omp (MCP server + session sync hook)
+"$DOTFILES_DIR/bin/setup-episodic-memory"
 
 # Codex config and skills
 make_link ~/.codex/config.toml "$DOTFILES_DIR/codex/config.toml"

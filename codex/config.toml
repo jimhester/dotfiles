@@ -55,7 +55,8 @@ gpt-6-astra = 4
 "gpt-6.1-sol" = 4
 
 [mcp_servers.episodic-memory]
-command = "/home/jimhester/dotfiles/bin/episodic-memory-mcp.sh"
+command = "/home/jimhester/dotfiles/bin/episodic-memory"
+args = ["mcp"]
 
 [mcp_servers.pixellab]
 url = "https://api.pixellab.ai/mcp"
