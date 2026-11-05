@@ -26,7 +26,7 @@
   "    let g:solarized_termtrans=1
       syntax enable               " syntax highlighting on
       set t_Co=16
-      set background=light
+      set background=dark
       colorscheme base16-default
   " }}}
   " Directories           {{{

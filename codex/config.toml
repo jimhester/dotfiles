@@ -44,7 +44,7 @@ trust_level = "trusted"
 trust_level = "trusted"
 
 [tui]
-theme = "solarized-light"
+theme = "solarized-dark"
 status_line = ["model-with-reasoning", "context-used", "current-dir"]
 screen_reader_detection_done = true
 

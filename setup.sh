@@ -66,7 +66,7 @@ for file in \
 done
 
 # Make dircolors link
-make_link ~/.dir_colors "$DOTFILES_DIR/dircolors/dircolors.ansi-light"
+make_link ~/.dir_colors "$DOTFILES_DIR/dircolors/dircolors.ansi-dark"
 
 # Make colemak directory link
 make_link ~/.colemak "$DOTFILES_DIR/colemak/"

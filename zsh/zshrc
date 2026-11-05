@@ -76,9 +76,9 @@ else
 
 	 # Use gdircolors on macOS (via Homebrew coreutils), dircolors on Linux
  if [[ "$OSTYPE" == darwin* ]]; then
-   eval `gdircolors ~/dotfiles/dircolors/dircolors.ansi-light`
+   eval `gdircolors ~/dotfiles/dircolors/dircolors.ansi-dark`
  else
-   eval `dircolors ~/dotfiles/dircolors/dircolors.ansi-light`
+   eval `dircolors ~/dotfiles/dircolors/dircolors.ansi-dark`
  fi
 
 	# set cdpath to commonly used directories

@@ -1,7 +1,7 @@
 onboarding = false
 
 [theme]
-name = "solarized-light"
+name = "solarized-dark"
 
 [terminal]
 shell_mode = "login"

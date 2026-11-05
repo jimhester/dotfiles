@@ -29,7 +29,7 @@ if(interactive() && requireNamespace("rlang", quietly = TRUE)) {
   # pip install pygments-style-solarized
   options(
     radian.prompt = "\033[0;34m>\033[0m ",
-    radian.color_scheme = "solarized-light",
+    radian.color_scheme = "solarized-dark",
     radian.auto_indentation = FALSE,
     radian.editing_mode = "vi",
     radian.show_vi_mode_prompt = FALSE,
@@ -252,7 +252,7 @@ options(
   show.error.locations= TRUE,
   keep.source = TRUE,
   keep.source.pkgs = TRUE,
-  reprex.highlight.hl_style  = "solarized-light",
+  reprex.highlight.hl_style  = "solarized-dark",
   reprex.highlight.font      = "Source Code Pro",
   reprex.highlight.font_size = 50,
   usethis.destdir = "~/pkg"
