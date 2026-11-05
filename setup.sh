@@ -81,6 +81,17 @@ else
     make_link ~/.config/ghostty/config.ghostty "$DOTFILES_DIR/ghostty/config.ghostty"
 fi
 
+# Windows Terminal (WSL): copy a JSON fragment; Windows can't follow WSL
+# symlinks. The fragment themes the stock profiles by guid. settings.json
+# outranks fragments, so keep colorScheme out of its profiles.defaults.
+CMD_EXE=/mnt/c/Windows/System32/cmd.exe
+if [[ "$OS" == "linux" ]] && grep -qi microsoft /proc/version 2>/dev/null && [[ -x "$CMD_EXE" ]]; then
+    WIN_LOCALAPPDATA="$(wslpath "$(cd /mnt/c && "$CMD_EXE" /c 'echo %LOCALAPPDATA%' 2>/dev/null | tr -d '\r')")"
+    WT_FRAGMENTS="$WIN_LOCALAPPDATA/Microsoft/Windows Terminal/Fragments/dotfiles"
+    mkdir -p "$WT_FRAGMENTS"
+    cp "$DOTFILES_DIR/windows-terminal/catppuccin.json" "$WT_FRAGMENTS/"
+fi
+
 # Clone work repo for Claude Code tooling
 WORK_REPO="$DOTFILES_DIR/work"
 if [[ ! -d "$WORK_REPO" ]]; then
