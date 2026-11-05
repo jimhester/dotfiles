@@ -74,6 +74,13 @@ make_link ~/.colemak "$DOTFILES_DIR/colemak/"
 # Herdr config
 make_link ~/.config/herdr/config.toml "$DOTFILES_DIR/herdr/config.toml"
 
+# Ghostty config (macOS reads Application Support; Linux reads XDG)
+if [[ "$OS" == "macos" ]]; then
+    make_link "$HOME/Library/Application Support/com.mitchellh.ghostty/config.ghostty" "$DOTFILES_DIR/ghostty/config.ghostty"
+else
+    make_link ~/.config/ghostty/config.ghostty "$DOTFILES_DIR/ghostty/config.ghostty"
+fi
+
 # Clone work repo for Claude Code tooling
 WORK_REPO="$DOTFILES_DIR/work"
 if [[ ! -d "$WORK_REPO" ]]; then
