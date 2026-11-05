@@ -81,15 +81,27 @@ else
     make_link ~/.config/ghostty/config.ghostty "$DOTFILES_DIR/ghostty/config.ghostty"
 fi
 
-# Windows Terminal (WSL): copy a JSON fragment; Windows can't follow WSL
-# symlinks. The fragment themes the stock profiles by guid. settings.json
-# outranks fragments, so keep colorScheme out of its profiles.defaults.
+# Windows Terminal (WSL): merge the Catppuccin scheme into settings.json and
+# make it the default. A JSON fragment didn't apply its profile updates here,
+# and Windows can't follow WSL symlinks, so edit settings.json in place.
 CMD_EXE=/mnt/c/Windows/System32/cmd.exe
 if [[ "$OS" == "linux" ]] && grep -qi microsoft /proc/version 2>/dev/null && [[ -x "$CMD_EXE" ]]; then
     WIN_LOCALAPPDATA="$(wslpath "$(cd /mnt/c && "$CMD_EXE" /c 'echo %LOCALAPPDATA%' 2>/dev/null | tr -d '\r')")"
-    WT_FRAGMENTS="$WIN_LOCALAPPDATA/Microsoft/Windows Terminal/Fragments/dotfiles"
-    mkdir -p "$WT_FRAGMENTS"
-    cp "$DOTFILES_DIR/windows-terminal/catppuccin.json" "$WT_FRAGMENTS/"
+    WT_SETTINGS="$WIN_LOCALAPPDATA/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json"
+    if [[ -f "$WT_SETTINGS" ]]; then
+        python3 - "$WT_SETTINGS" "$DOTFILES_DIR/windows-terminal/catppuccin.json" <<'EOF' || echo "Skipping Windows Terminal theme: could not parse settings.json"
+import json, sys
+settings_path, scheme_path = sys.argv[1:]
+settings = json.load(open(settings_path, encoding="utf-8"))
+scheme = json.load(open(scheme_path, encoding="utf-8"))
+schemes = [s for s in settings.get("schemes", []) if s.get("name") != scheme["name"]]
+settings["schemes"] = schemes + [scheme]
+settings.setdefault("profiles", {}).setdefault("defaults", {})["colorScheme"] = scheme["name"]
+with open(settings_path, "w", encoding="utf-8") as f:
+    json.dump(settings, f, indent=4)
+    f.write("\n")
+EOF
+    fi
 fi
 
 # Clone work repo for Claude Code tooling
