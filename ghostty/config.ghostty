@@ -1,1 +1,3 @@
 theme = iTerm2 Solarized Dark
+# OLED: true black instead of Solarized base03 (#002b36).
+background = #000000

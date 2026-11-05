@@ -5,7 +5,12 @@ return {
     lazy = false,
     priority = 1000,
     config = function()
+      -- Transparent background so the terminal's black shows through (OLED).
+      vim.g.solarized_termtrans = 1
       vim.cmd.colorscheme("solarized")
+      -- termtrans leaves the line-number gutter on base02; keep it black too.
+      vim.cmd("highlight LineNr guibg=NONE ctermbg=NONE")
+      vim.cmd("highlight CursorLineNr guibg=NONE ctermbg=NONE")
     end,
   },
 

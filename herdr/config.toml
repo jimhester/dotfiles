@@ -3,6 +3,11 @@ onboarding = false
 [theme]
 name = "solarized-dark"
 
+# OLED: black panels and sidebar instead of Solarized base03.
+[theme.custom]
+panel_bg = "reset"
+sidebar_bg = "#000000"
+
 [terminal]
 shell_mode = "login"
 
