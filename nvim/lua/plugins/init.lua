@@ -1,16 +1,17 @@
 return {
   -- Colorscheme
   {
-    "ishan9299/nvim-solarized-lua",
+    "catppuccin/nvim",
+    name = "catppuccin",
     lazy = false,
     priority = 1000,
     config = function()
-      -- Transparent background so the terminal's black shows through (OLED).
-      vim.g.solarized_termtrans = 1
-      vim.cmd.colorscheme("solarized")
-      -- termtrans leaves the line-number gutter on base02; keep it black too.
-      vim.cmd("highlight LineNr guibg=NONE ctermbg=NONE")
-      vim.cmd("highlight CursorLineNr guibg=NONE ctermbg=NONE")
+      require("catppuccin").setup({
+        flavour = "mocha",
+        -- Let the terminal's black background show through (OLED).
+        transparent_background = true,
+      })
+      vim.cmd.colorscheme("catppuccin")
     end,
   },
 
@@ -93,7 +94,7 @@ return {
     dependencies = { "nvim-tree/nvim-web-devicons" },
     config = function()
       require("lualine").setup({
-        options = { theme = "solarized_dark" },
+        options = { theme = "catppuccin-nvim" },
       })
     end,
   },

@@ -1,9 +1,9 @@
 onboarding = false
 
 [theme]
-name = "solarized-dark"
+name = "catppuccin"
 
-# OLED: black panels and sidebar instead of Solarized base03.
+# OLED: black panels and sidebar instead of Catppuccin base.
 [theme.custom]
 panel_bg = "reset"
 sidebar_bg = "#000000"
