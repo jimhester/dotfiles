@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Runs the episodic-memory CLI, or its MCP server with `episodic-memory mcp`,
-# under a Node that better-sqlite3 supports. Installs dependencies on first run
-# and rebuilds the native binding whenever the Node ABI changes.
+# Runs the episodic-memory CLI, its MCP server over stdio with
+# `episodic-memory mcp`, or one MCP server shared by every agent over HTTP with
+# `episodic-memory serve [--port N]` (run by the episodic-memory systemd user
+# service), under a Node that better-sqlite3 supports. Installs dependencies on
+# first run and rebuilds the native binding whenever the Node ABI changes.
 #
 # better-sqlite3 12.x supports Node 20-25 and does not compile on Node 26, so
 # prefer Homebrew's node@24 keg (stable path across patch upgrades) over
@@ -58,5 +60,9 @@ fi
 if [[ "${1:-}" == "mcp" ]]; then
   shift
   exec "$NODE" "$EM_DIR/cli/mcp-server-wrapper.js" "$@"
+fi
+if [[ "${1:-}" == "serve" ]]; then
+  shift
+  exec "$NODE" "$EM_DIR/dist/mcp-server.js" --http "$@"
 fi
 exec "$NODE" "$EM_DIR/cli/episodic-memory.js" "$@"

@@ -3,7 +3,9 @@
 #   - clones jimhester/episodic-memory (obra fork with omp parser fixes) to $EPISODIC_MEMORY_DIR (default ~/p/episodic-memory)
 #   - links the bin/episodic-memory wrapper to ~/.local/bin
 #   - links omp/hooks/post (session_start/session_shutdown sync) into omp
-#   - registers the episodic-memory MCP server in omp's mcp.json
+#   - registers the episodic-memory MCP server in omp's mcp.json: on Linux with
+#     systemd, one shared HTTP server (episodic-memory.service, a user unit)
+#     for every agent; elsewhere, a stdio server per agent
 #
 # Safe to re-run. Called from setup.sh.
 
@@ -57,13 +59,40 @@ done
 # omp skips symlinked hook files, so link the directory instead.
 make_link "$OMP_AGENT_DIR/hooks/post" "$DOTFILES_DIR/omp/hooks/post"
 
+# Linux with a systemd user manager: one server for every agent instead of a
+# node process per agent. systemd's PATH lacks nvm etc., so pin the Node now.
+MCP_PORT=47231
+if [[ "$OSTYPE" == linux* ]] && systemctl --user show-environment >/dev/null 2>&1; then
+  node_bin="${EPISODIC_MEMORY_NODE:-$(command -v node)}"
+  unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+  mkdir -p "$unit_dir"
+  cat > "$unit_dir/episodic-memory.service" <<EOF
+[Unit]
+Description=Episodic memory MCP server shared by all agents (http://127.0.0.1:$MCP_PORT/mcp)
+
+[Service]
+ExecStart=$WRAPPER serve --port $MCP_PORT
+Environment=EPISODIC_MEMORY_NODE=$node_bin
+Restart=always
+RestartSec=2
+MemoryMax=1G
+
+[Install]
+WantedBy=default.target
+EOF
+  systemctl --user daemon-reload
+  systemctl --user enable episodic-memory.service
+  systemctl --user restart episodic-memory.service
+  mcp_entry="{type: \"http\", url: \"http://127.0.0.1:$MCP_PORT/mcp\"}"
+else
+  mcp_entry='{type: "stdio", command: $cmd, args: ["mcp"]}'
+fi
+
 # mcp.json also holds machine-specific servers; merge only our entry.
 MCP_JSON="$OMP_AGENT_DIR/mcp.json"
 [[ -f "$MCP_JSON" ]] || echo '{"mcpServers": {}}' > "$MCP_JSON"
 tmp="$(mktemp)"
-jq --arg cmd "$WRAPPER" \
-  '.mcpServers["episodic-memory"] = {type: "stdio", command: $cmd, args: ["mcp"]}' \
-  "$MCP_JSON" > "$tmp"
+jq --arg cmd "$WRAPPER" ".mcpServers[\"episodic-memory\"] = $mcp_entry" "$MCP_JSON" > "$tmp"
 mv "$tmp" "$MCP_JSON"
 
 echo "episodic-memory ready: MCP server and session sync hook registered in $OMP_AGENT_DIR"
