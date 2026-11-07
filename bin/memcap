@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# memcap SIZE CMD [ARGS...]: run CMD with a hard memory limit (e.g. 6G, 512M).
+#
+# CMD and everything it starts run in their own systemd user scope with
+# MemoryMax=SIZE and no swap. If the job outgrows SIZE, the kernel kills the
+# whole job instead of pushing the machine into swap, and memcap says so on
+# stderr. Exit status is CMD's.
+
+set -uo pipefail
+
+if [[ $# -lt 2 ]]; then
+  echo "usage: memcap SIZE CMD [ARGS...]   (SIZE like 6G or 512M)" >&2
+  exit 2
+fi
+size="$1"
+shift
+if [[ ! "$size" =~ ^[0-9]+[KMGT]$ ]]; then
+  echo "memcap: SIZE must be a number with a K, M, G or T suffix, got '$size'" >&2
+  exit 2
+fi
+if ! systemctl --user show-environment >/dev/null 2>&1; then
+  echo "memcap: no systemd user manager here; cannot cap memory" >&2
+  exit 2
+fi
+
+unit="memcap-$$-$(date +%s)"
+systemd-run --user --scope --quiet --collect --unit="$unit" \
+  -p MemoryMax="$size" -p MemorySwapMax=0 -p OOMPolicy=kill \
+  -- "$@"
+status=$?
+# 137 = SIGKILL, which is how a job that hits MemoryMax ends.
+if [[ $status -eq 137 ]]; then
+  echo "memcap: '$*' was killed (SIGKILL), most likely for exceeding $size; give it more, reduce its parallelism, or run it when the machine is quieter" >&2
+fi
+exit "$status"
