@@ -240,6 +240,36 @@ def default_base(repo: Path) -> str:
     fail("could not determine the base branch; pass --base")
 
 
+def refresh_base(repo: Path, base: str) -> None:
+    """Fetch a remote-tracking base so new branches start from the latest remote."""
+    full_name = git_output(
+        repo, "rev-parse", "--symbolic-full-name", base, check=False
+    )
+    if not full_name.startswith("refs/remotes/"):
+        return
+    remote_ref = full_name.removeprefix("refs/remotes/")
+    remotes = git_output(repo, "remote").splitlines()
+    # Longest match first so a remote named "a/b" wins over "a".
+    for remote in sorted(remotes, key=len, reverse=True):
+        if remote_ref.startswith(f"{remote}/"):
+            branch = remote_ref.removeprefix(f"{remote}/")
+            break
+    else:
+        return
+    result = run(
+        ["git", "fetch", "--quiet", remote, f"+refs/heads/{branch}:{full_name}"],
+        cwd=repo,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        print(
+            f"workon: warning: could not fetch {base}; branching from the local "
+            f"copy, which may be stale: {detail}",
+            file=sys.stderr,
+        )
+
+
 def find_worktree(repo: Path, branch: str) -> Path | None:
     output = git_output(repo, "worktree", "list", "--porcelain")
     path: Path | None = None
@@ -287,6 +317,7 @@ def open_workspace(
             "--json",
         ]
     else:
+        refresh_base(repo, base)
         command = [
             "herdr",
             "worktree",

@@ -22,7 +22,9 @@ workon --dry-run 123               # Show the branch and prompt only
 ```
 
 Herdr owns worktree creation, workspaces, agent state, session restoration, and
-notifications. The launcher only resolves task metadata and starts omp.
+notifications. The launcher only resolves task metadata, fetches the base branch
+(default: the remote HEAD, e.g. `origin/main`) so new worktrees start from the
+latest remote code, and starts omp.
 
 The `workon` Codex skill teaches agents to dispatch issue work through `workon`
 and use Herdr for lifecycle management.
