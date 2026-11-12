@@ -87,3 +87,14 @@ camClear() {
     sudo killall AppleCameraAssistant
     sudo killall VDCAssistant
 }
+
+# Elements drive shared from the Mac over SMB (Tailscale address).
+elements-mount() {
+    sudo mkdir -p /mnt/elements
+    sudo mount -t cifs //100.85.128.84/Elements /mnt/elements \
+        -o username=jimhester,uid=$(id -u),gid=$(id -g),vers=3.0,soft
+}
+
+elements-umount() {
+    sudo umount /mnt/elements 2>/dev/null || sudo umount -l /mnt/elements
+}
